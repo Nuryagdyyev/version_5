@@ -5,3 +5,5 @@ python-pptx==1.0.2
 Pillow==10.4.0
 pdfminer.six==20231228
 lxml>=4.9.0
+pydantic==2.7.4
+pydantic-core==2.18.4
