@@ -44,9 +44,9 @@ log = logging.getLogger(__name__)
 
 # ── SAZLAMALAR ──────────────────────────────────────────────
 # ✏️ DIŇE ŞU ÝERLERI ÜÝTGEDIN
-BOT_TOKEN        = "SIZIŇ_BOT_TOKENIŇIZ"       # @BotFather-dan
-DEEPSEEK_API_KEY = "SIZIŇ_DEEPSEEK_AÇARYŇYZ"   # platform.deepseek.com
-REDIS_URL        = None
+BOT_TOKEN        = os.getenv("BOT_TOKEN", "")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+REDIS_URL        = os.getenv("REDIS_URL", None)
 
 ADMIN_IDS        = [8512644114, 7404431806]
 INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
@@ -58,8 +58,8 @@ CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
 CONTACT_PHONE    = "+7 922 309 80 64"   # ulanyjyny netije alanyndan soň habarlaşmak üçin
-STABILITY_API_KEY = "SIZIŇ_STABILITY_AÇARYŇYZ"  # platform.stability.ai
-DB_PATH           = "bot.db"
+STABILITY_API_KEY = os.getenv("STABILITY_API_KEY", "")
+DB_PATH           = os.getenv("DB_PATH", "bot.db")
 STABILITY_URL    = "https://api.stability.ai/v2beta/stable-image/generate/core"
 
 
