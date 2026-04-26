@@ -44,9 +44,9 @@ log = logging.getLogger(__name__)
 
 # ── SAZLAMALAR ──────────────────────────────────────────────
 # ✏️ DIŇE ŞU ÝERLERI ÜÝTGEDIN
-BOT_TOKEN        = os.getenv("BOT_TOKEN", "")
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-REDIS_URL        = os.getenv("REDIS_URL", None)
+BOT_TOKEN        = "SIZIŇ_BOT_TOKENIŇIZ"       # @BotFather-dan
+DEEPSEEK_API_KEY = "SIZIŇ_DEEPSEEK_AÇARYŇYZ"   # platform.deepseek.com
+REDIS_URL        = None
 
 ADMIN_IDS        = [8512644114, 7404431806]
 INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
@@ -58,8 +58,8 @@ CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
 CONTACT_PHONE    = "+7 922 309 80 64"   # ulanyjyny netije alanyndan soň habarlaşmak üçin
-STABILITY_API_KEY = os.getenv("STABILITY_API_KEY", "")
-DB_PATH           = os.getenv("DB_PATH", "bot.db")
+STABILITY_API_KEY = "SIZIŇ_STABILITY_AÇARYŇYZ"  # platform.stability.ai
+DB_PATH           = "bot.db"
 STABILITY_URL    = "https://api.stability.ai/v2beta/stable-image/generate/core"
 
 
@@ -1206,8 +1206,8 @@ def _copy_template_title(doc: Document, d: dict):
         _append(p_year)
 
 
-def _auto_toc(doc, line_v: int):
-    _contents_h = {"ru":"Содержание","en":"Contents"}.get(_doc_lang_mw,"Содержание")
+def _auto_toc(doc, line_v: int, doc_lang: str = "ru"):
+    _contents_h = {"ru":"Содержание","en":"Contents"}.get(doc_lang,"Содержание")
     _para(doc, _contents_h, bold=True, center=True, size_pt=14,
           line=line_v, first_line=0, space_after=0)
     p = doc.add_paragraph()
@@ -1296,12 +1296,12 @@ def make_word(raw_text: str, d: dict) -> bytes:
     _init_heading(doc)
     _copy_template_title(doc, d)
     _page_break(doc)
-    _auto_toc(doc, lv_)
-    _page_break(doc)
     _doc_lang_mw = d.get("doc_lang","ru")
     _intro_h   = {"ru":"Введение",         "en":"Introduction"}.get(_doc_lang_mw,"Введение")
     _concl_h   = {"ru":"ЗАКЛЮЧЕНИЕ",       "en":"CONCLUSION"}.get(_doc_lang_mw,"ЗАКЛЮЧЕНИЕ")
     _sources_h = {"ru":"Список литературы","en":"References"}.get(_doc_lang_mw,"Список литературы")
+    _auto_toc(doc, lv_, _doc_lang_mw)
+    _page_break(doc)
     _heading(doc, _intro_h, lv_)
     for ln in parsed["intro"]:
         t = md_clean(ln)
@@ -1849,7 +1849,9 @@ async def _run_generate(cb: CallbackQuery, state: FSMContext, d: dict = None):
         raw       = await call_deepseek(d, pcb)
         doc_bytes = await asyncio.get_running_loop().run_in_executor(None, make_word, raw, d)
         PENDING[cb.from_user.id] = {"bytes": doc_bytes, "data": d}
-        await bot.edit_message_text(f"✅ <b>Işiňiz taýar boldy!</b>\n\n{t_summary(d)}",
+        _lang_r = d.get("ui_lang","tk")
+        _ready_hdr = {"tk":"✅ <b>Işiňiz taýar boldy!</b>","ru":"✅ <b>Работа готова!</b>","en":"✅ <b>Work is ready!</b>"}.get(_lang_r,"✅ <b>Taýar!</b>")
+        await bot.edit_message_text(f"{_ready_hdr}\n\n{t_summary(d)}",
                                      chat_id=cid, message_id=mid, parse_mode="HTML")
         await deliver(cb.from_user.id, bot)
     except Exception as exc:
@@ -2460,27 +2462,33 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
         await cb.answer("⏳ Eýýäm taýarlanýar!", show_alert=True); return
     ACTIVE_GENERATES.add(uid); CANCELLED_GENERATES.discard(uid)
 
+    _ui_lang_init = d.get("ui_lang","tk")
+    _start_txt = {"tk":"Başlanýar...","ru":"Начинаем...","en":"Starting..."}.get(_ui_lang_init,"Başlanýar...")
+    _hdr_init  = {"tk":"Prezentasiýa taýarlanýar","ru":"Презентация создаётся","en":"Presentation is being created"}.get(_ui_lang_init,"Prezentasiýa taýarlanýar")
     prog = await cb.message.edit_text(
-        f"⚙️ <b>Prezentasiýa taýarlanýar...</b>\n\n"
+        f"⚙️ <b>{_hdr_init}...</b>\n\n"
         f"📝 <i>{theme}</i>\n\n"
-        f"<code>[░░░░░░░░░░]</code> <b>0%</b>\n<i>Başlanýar...</i>",
+        f"<code>[░░░░░░░░░░]</code> <b>0%</b>\n<i>{_start_txt}</i>",
         parse_mode="HTML")
     await cb.answer(); await state.clear()
     cid = cb.message.chat.id; mid = prog.message_id
 
+    _ui_lang = d.get("ui_lang","tk")
+    _pptx_hdr = {"tk":"Prezentasiýa taýarlanýar","ru":"Презентация создаётся","en":"Presentation is being created"}.get(_ui_lang,"Prezentasiýa taýarlanýar")
     async def upd(pct, status, tot=0, don=0):
         bar = "█"*(pct//10)+"░"*(10-pct//10)
         sl  = f"\n🖼 {don}/{tot}" if tot > 0 else ""
         try:
             await bot.edit_message_text(
-                f"⚙️ <b>Prezentasiýa taýarlanýar...</b>\n\n"
+                f"⚙️ <b>{_pptx_hdr}...</b>\n\n"
                 f"📝 <i>{theme}</i>{sl}\n\n"
                 f"<code>[{bar}]</code> <b>{pct}%</b>\n<i>{status}</i>",
                 chat_id=cid, message_id=mid, parse_mode="HTML")
         except: pass
 
     try:
-        await upd(10,"📝 Slaýd mazmuny ýazylýar...",n,0)
+        _s1 = {"tk":"📝 Slaýd mazmuny ýazylýar...","ru":"📝 Создание содержания слайдов...","en":"📝 Writing slide content..."}.get(_ui_lang,"📝")
+        await upd(10,_s1,n,0)
         slides_data = await call_deepseek_pptx(theme, n, pres_lang)
 
         # Slaýd sanyna görä surat sany
@@ -2541,19 +2549,20 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
                 # Fon slaýdlar — hökman surat
                 img_count += 1
                 await upd(20+int(55*i/len(slides_data)),
-                          f"🖼 Fon surat {img_count} döredilýär...",
+                          {"tk":f"🖼 Fon surat {img_count} döredilýär...","ru":f"🖼 Фон изображение {img_count}...","en":f"🖼 Background image {img_count}..."}.get(_ui_lang,f"🖼 {img_count}"),
                           len(slides_data), img_count)
                 images.append(await gen_image(sld.get("image_prompt", theme)))
             elif i in _img_slots:
                 img_count += 1
                 await upd(20+int(55*i/len(slides_data)),
-                          f"🖼 Surat {img_count} döredilýär ({i+1}/{n})...",
+                          {"tk":f"🖼 Surat {img_count} döredilýär ({i+1}/{n})...","ru":f"🖼 Изображение {img_count} ({i+1}/{n})...","en":f"🖼 Image {img_count} ({i+1}/{n})..."}.get(_ui_lang,f"🖼 {img_count}"),
                           len(slides_data), img_count)
                 images.append(await gen_image(sld.get("image_prompt", theme)))
             else:
                 images.append(None)
 
-        await upd(85,"📊 Prezentasiýa ýygnalyp durýar...",len(slides_data),len(slides_data))
+        _s85 = {"tk":"📊 Prezentasiýa ýygnalyp durýar...","ru":"📊 Сборка презентации...","en":"📊 Building presentation..."}.get(_ui_lang,"📊")
+        await upd(85,_s85,len(slides_data),len(slides_data))
         pptx_bytes = await asyncio.get_running_loop().run_in_executor(
             None, build_pptx, slides_data, theme, images)
 
