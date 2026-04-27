@@ -53,7 +53,7 @@ INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
-PRICE_STARS      = {"referat": 19, "doklad": 19, "pptx": 19}  # Telegram Stars
+PRICE_STARS      = {"referat": 3, "doklad": 13, "pptx": 13}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
@@ -1385,7 +1385,7 @@ async def deliver(uid: int, bot: Bot):
     info = PENDING.pop(uid)
     d    = info["data"]
     svc  = d.get("service", "referat")
-    price = PRICE_STARS.get(svc, 19)
+    price = PRICE_STARS.get(svc, 3)
     svc_nm = {"referat":"Referat 📄","doklad":"Doklad 🎤","pptx":"Prezentasiýa 📊"}.get(svc, svc)
 
     # Ulanyjyny DB-ä goş (ýok bolsa)
@@ -1428,7 +1428,7 @@ async def deliver(uid: int, bot: Bot):
         return
 
     # Galan sargytlar — Stars töleg
-    stars = PRICE_STARS.get(svc, 19)
+    stars = PRICE_STARS.get(svc, 3)
     oid   = _db_add_order(uid, svc, d.get("theme",""), stars, is_free=False, status="pending")
     PAYMENT_PENDING[uid] = {**info, "order_id": oid}
     lang  = d.get("ui_lang","tk")
@@ -2110,10 +2110,24 @@ def _prun(tf, text, size, bold=False, color=None, italic=False, first=False, sp=
     return p
 
 def _pimg(slide, img, l, t, w, h):
+    if not img:
+        return False
     try:
-        slide.shapes.add_picture(io.BytesIO(img), Inches(l), Inches(t), Inches(w), Inches(h))
+        from PIL import Image as _PIL_Image
+        import io as _io2
+        # Suraty JPEG hökmünde convert et (python-pptx üçin)
+        pil_img = _PIL_Image.open(_io2.BytesIO(img))
+        if pil_img.mode in ("RGBA", "LA", "P"):
+            pil_img = pil_img.convert("RGB")
+        out_buf = _io2.BytesIO()
+        pil_img.save(out_buf, format="JPEG", quality=85)
+        out_buf.seek(0)
+        slide.shapes.add_picture(out_buf, Inches(l), Inches(t), Inches(w), Inches(h))
         return True
-    except: return False
+    except Exception as _e:
+        import logging as _log2
+        _log2.getLogger(__name__).warning(f"_pimg şowsuz: {_e}")
+        return False
 
 def _pdot(slide, l, t, color=None):
     sh = slide.shapes.add_shape(9, Inches(l), Inches(t), Inches(0.22), Inches(0.22))
@@ -2342,17 +2356,18 @@ async def gen_image(prompt: str):
         files   = {
             "prompt":        (None, prompt + ", professional, photorealistic"),
             "aspect_ratio":  (None, "16:9"),
-            "output_format": (None, "webp"),  # webp has_chart -- PNG-den kiçi
+            "output_format": (None, "jpeg"),
         }
         async with httpx.AsyncClient(timeout=httpx.Timeout(connect=30,read=120,write=30,pool=10)) as cl:
             r = await cl.post(STABILITY_URL, headers=headers, files=files)
+            log.info(f"Stability jogap: {r.status_code}")
             if r.status_code == 200:
                 log.info(f"✅ Surat taýar ({len(r.content)} baýt)")
                 return r.content
-            log.warning(f"Stability {r.status_code}: {r.text[:150]}")
+            log.error(f"❌ Stability {r.status_code}: {r.text[:300]}")
             return None
     except Exception as e:
-        log.warning(f"Surat şowsuz: {e}"); return None
+        log.error(f"❌ Surat şowsuz: {type(e).__name__}: {e}"); return None
 
 
 def _fix_json_pptx(raw: str) -> str:
@@ -2599,15 +2614,15 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
                 "tk": (f"✅ <b>Prezentasiýaňyz taýar boldy!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} slaýd\n\n"
                        f"⭐ <b>Töleg üçin aşakdaky düwmä basyň:</b>\n"
-                       f"💰 Baha: <b>19 Telegram Stars</b>"),
+                       f"💰 Baha: <b>3 Telegram Stars</b>"),
                 "ru": (f"✅ <b>Ваша презентация готова!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} слайдов\n\n"
                        f"⭐ <b>Для оплаты нажмите кнопку ниже:</b>\n"
-                       f"💰 Стоимость: <b>19 Telegram Stars</b>"),
+                       f"💰 Стоимость: <b>3 Telegram Stars</b>"),
                 "en": (f"✅ <b>Your presentation is ready!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} slides\n\n"
                        f"⭐ <b>Press the button below to pay:</b>\n"
-                       f"💰 Price: <b>19 Telegram Stars</b>"),
+                       f"💰 Price: <b>3 Telegram Stars</b>"),
             }
             await bot.edit_message_text(
                 pay_msgs.get(lang_p, pay_msgs["tk"]),
@@ -2674,7 +2689,7 @@ async def h_stars_paid(msg: Message, bot: Bot):
     svc   = d.get("service","referat")
     theme = d.get("theme","")
     lang  = d.get("ui_lang","tk")
-    stars = PRICE_STARS.get(svc, 2)  # synag üçin 2, hakyky: 19
+    stars = PRICE_STARS.get(svc, 2)  # synag üçin 2, hakyky: 3
     oid   = info.get("order_id")
     if oid: _db_update_order_status(oid,"delivered")
     _db_mark_paid(uid, stars)
