@@ -53,7 +53,7 @@ INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
-PRICE_STARS      = {"referat": 19, "doklad": 19, "pptx": 19}  # Telegram Stars
+PRICE_STARS      = {"referat": 149, "doklad": 149, "pptx": 149}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
@@ -1385,7 +1385,7 @@ async def deliver(uid: int, bot: Bot):
     info = PENDING.pop(uid)
     d    = info["data"]
     svc  = d.get("service", "referat")
-    price = PRICE_STARS.get(svc, 19)
+    price = PRICE_STARS.get(svc, 159)
     svc_nm = {"referat":"Referat 📄","doklad":"Doklad 🎤","pptx":"Prezentasiýa 📊"}.get(svc, svc)
 
     # Ulanyjyny DB-ä goş (ýok bolsa)
@@ -1421,13 +1421,14 @@ async def deliver(uid: int, bot: Bot):
             uid,
             BufferedInputFile(fb, filename=fname),
             caption=free_caps.get(lang_d, free_caps["tk"]),
-            parse_mode="HTML"
+            parse_mode="HTML",
+            request_timeout=120
         )
         log.info(f"🎁 uid={uid} MUGT hyzmat aldy ({svc})")
         return
 
     # Galan sargytlar — Stars töleg
-    stars = PRICE_STARS.get(svc, 19)
+    stars = PRICE_STARS.get(svc, 159)
     oid   = _db_add_order(uid, svc, d.get("theme",""), stars, is_free=False, status="pending")
     PAYMENT_PENDING[uid] = {**info, "order_id": oid}
     lang  = d.get("ui_lang","tk")
@@ -2339,9 +2340,9 @@ async def gen_image(prompt: str):
     try:
         headers = {"Authorization": f"Bearer {STABILITY_API_KEY}", "Accept": "image/*"}
         files   = {
-            "prompt":        (None, prompt + ", professional, photorealistic, high quality"),
+            "prompt":        (None, prompt + ", professional, photorealistic"),
             "aspect_ratio":  (None, "16:9"),
-            "output_format": (None, "png"),
+            "output_format": (None, "webp"),  # webp has_chart -- PNG-den kiçi
         }
         async with httpx.AsyncClient(timeout=httpx.Timeout(connect=30,read=120,write=30,pool=10)) as cl:
             r = await cl.post(STABILITY_URL, headers=headers, files=files)
@@ -2583,7 +2584,8 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
             await bot.edit_message_text(free_hdr.get(lang_f,free_hdr["tk"]),
                 chat_id=cid, message_id=mid, parse_mode="HTML")
             await bot.send_document(uid, BufferedInputFile(pptx_bytes, filename=fname),
-                caption=free_cap.get(lang_f,free_cap["tk"]), parse_mode="HTML")
+                caption=free_cap.get(lang_f,free_cap["tk"]), parse_mode="HTML",
+                request_timeout=120)
         else:
             oid = _db_add_order(uid, "pptx", theme, PRICE_STARS["pptx"], is_free=False, status="pending")
             lang_p = d.get("ui_lang","tk")
@@ -2597,15 +2599,15 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
                 "tk": (f"✅ <b>Prezentasiýaňyz taýar boldy!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} slaýd\n\n"
                        f"⭐ <b>Töleg üçin aşakdaky düwmä basyň:</b>\n"
-                       f"💰 Baha: <b>19 Telegram Stars</b>"),
+                       f"💰 Baha: <b>159 Telegram Stars</b>"),
                 "ru": (f"✅ <b>Ваша презентация готова!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} слайдов\n\n"
                        f"⭐ <b>Для оплаты нажмите кнопку ниже:</b>\n"
-                       f"💰 Стоимость: <b>19 Telegram Stars</b>"),
+                       f"💰 Стоимость: <b>159 Telegram Stars</b>"),
                 "en": (f"✅ <b>Your presentation is ready!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} slides\n\n"
                        f"⭐ <b>Press the button below to pay:</b>\n"
-                       f"💰 Price: <b>19 Telegram Stars</b>"),
+                       f"💰 Price: <b>159 Telegram Stars</b>"),
             }
             await bot.edit_message_text(
                 pay_msgs.get(lang_p, pay_msgs["tk"]),
@@ -2672,7 +2674,7 @@ async def h_stars_paid(msg: Message, bot: Bot):
     svc   = d.get("service","referat")
     theme = d.get("theme","")
     lang  = d.get("ui_lang","tk")
-    stars = PRICE_STARS.get(svc, 2)  # synag üçin 2, hakyky: 19
+    stars = PRICE_STARS.get(svc, 2)  # synag üçin 2, hakyky: 159
     oid   = info.get("order_id")
     if oid: _db_update_order_status(oid,"delivered")
     _db_mark_paid(uid, stars)
@@ -2687,7 +2689,8 @@ async def h_stars_paid(msg: Message, bot: Bot):
                "ru":f"✅ <b>Готово!</b>\n\n📝 {theme}\n\n❓ Вопросы: <code>{CONTACT_PHONE}</code>\nНовый заказ: /start",
                "en":f"✅ <b>Ready!</b>\n\n📝 {theme}\n\n❓ Questions: <code>{CONTACT_PHONE}</code>\nNew order: /start"}
     await bot.send_document(uid, BufferedInputFile(fb, filename=fname),
-        caption=del_msg.get(lang_sp, del_msg["tk"]), parse_mode="HTML")
+        caption=del_msg.get(lang_sp, del_msg["tk"]), parse_mode="HTML",
+        request_timeout=120)
     log.info(f"⭐ Stars: uid={uid} {stars}★ {svc}")
 
 # ════════════════════════════════════════════════════════════════════
@@ -2695,7 +2698,7 @@ async def main():
     from aiogram.client.default import DefaultBotProperties
     from aiogram.client.session.aiohttp import AiohttpSession
 
-    session = AiohttpSession(timeout=300)
+    session = AiohttpSession(timeout=600)
     bot = Bot(token=BOT_TOKEN, session=session,
               default=DefaultBotProperties(parse_mode="HTML"))
     me  = await bot.get_me()
