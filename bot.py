@@ -1385,7 +1385,7 @@ async def deliver(uid: int, bot: Bot):
     info = PENDING.pop(uid)
     d    = info["data"]
     svc  = d.get("service", "referat")
-    price = PRICE_STARS.get(svc, 159)
+    price = PRICE_STARS.get(svc, 149)
     svc_nm = {"referat":"Referat 📄","doklad":"Doklad 🎤","pptx":"Prezentasiýa 📊"}.get(svc, svc)
 
     # Ulanyjyny DB-ä goş (ýok bolsa)
@@ -1427,7 +1427,7 @@ async def deliver(uid: int, bot: Bot):
         return
 
     # Galan sargytlar — Stars töleg
-    stars = PRICE_STARS.get(svc, 159)
+    stars = PRICE_STARS.get(svc, 149)
     oid   = _db_add_order(uid, svc, d.get("theme",""), stars, is_free=False, status="pending")
     PAYMENT_PENDING[uid] = {**info, "order_id": oid}
     lang  = d.get("ui_lang","tk")
@@ -2597,15 +2597,15 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
                 "tk": (f"✅ <b>Prezentasiýaňyz taýar boldy!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} slaýd\n\n"
                        f"⭐ <b>Töleg üçin aşakdaky düwmä basyň:</b>\n"
-                       f"💰 Baha: <b>159 Telegram Stars</b>"),
+                       f"💰 Baha: <b>149 Telegram Stars</b>"),
                 "ru": (f"✅ <b>Ваша презентация готова!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} слайдов\n\n"
                        f"⭐ <b>Для оплаты нажмите кнопку ниже:</b>\n"
-                       f"💰 Стоимость: <b>159 Telegram Stars</b>"),
+                       f"💰 Стоимость: <b>149 Telegram Stars</b>"),
                 "en": (f"✅ <b>Your presentation is ready!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} slides\n\n"
                        f"⭐ <b>Press the button below to pay:</b>\n"
-                       f"💰 Price: <b>159 Telegram Stars</b>"),
+                       f"💰 Price: <b>149 Telegram Stars</b>"),
             }
             await bot.edit_message_text(
                 pay_msgs.get(lang_p, pay_msgs["tk"]),
@@ -2672,7 +2672,7 @@ async def h_stars_paid(msg: Message, bot: Bot):
     svc   = d.get("service","referat")
     theme = d.get("theme","")
     lang  = d.get("ui_lang","tk")
-    stars = PRICE_STARS.get(svc, 2)  # synag üçin 2, hakyky: 159
+    stars = PRICE_STARS.get(svc, 2)  # synag üçin 2, hakyky: 149
     oid   = info.get("order_id")
     if oid: _db_update_order_status(oid,"delivered")
     _db_mark_paid(uid, stars)
