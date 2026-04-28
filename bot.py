@@ -563,6 +563,7 @@ class St(StatesGroup):
     sp1  = State()  # tema
     sp1b = State()  # at-familiýa
     sp1c = State()  # kurs
+    sp1d = State()  # gruppa
     sp2  = State()  # dil
     sp3  = State()  # slayd sany
 
@@ -2172,24 +2173,68 @@ def _add_chart_pptx(slide, chart_data: dict, l, t, w, h):
     try:
         from pptx.chart.data import ChartData
         from pptx.enum.chart import XL_CHART_TYPE
-        labels = chart_data.get("labels",["A","B","C"])
-        values = chart_data.get("values",[40,35,25])
-        title  = chart_data.get("title","")
-        ctype  = chart_data.get("type","bar")
-        cd = ChartData(); cd.categories = labels; cd.add_series("", values)
-        ct_map = {"bar":XL_CHART_TYPE.BAR_CLUSTERED,"pie":XL_CHART_TYPE.PIE,"line":XL_CHART_TYPE.LINE}
-        chart = slide.shapes.add_chart(ct_map.get(ctype,XL_CHART_TYPE.BAR_CLUSTERED),
-                    Inches(l),Inches(t),Inches(w),Inches(h),cd).chart
+        from pptx.util import Pt as _Pt2
+        labels  = chart_data.get("labels",["A","B","C"])
+        values  = chart_data.get("values",[40,35,25])
+        title   = chart_data.get("title","")
+        ctype   = chart_data.get("type","bar")
+        caption = chart_data.get("caption","")   # asagyndaky düşündiriş
+
+        # Ýokarda başlyk tekst gutujygy (chart içindäki title däl)
         if title:
-            chart.has_title = True
-            chart.chart_title.text_frame.text = title
-            chart.chart_title.text_frame.paragraphs[0].runs[0].font.size = PPtx(11)
-        chart.has_legend = False; return True
+            tx_ct = slide.shapes.add_textbox(Inches(l), Inches(t-0.35), Inches(w), Inches(0.35))
+            tf_ct = tx_ct.text_frame; tf_ct.word_wrap = True
+            p_ct = tf_ct.paragraphs[0]; p_ct.alignment = PP_ALIGN.CENTER
+            r_ct = p_ct.add_run(); r_ct.text = title
+            r_ct.font.name = "Times New Roman"; r_ct.font.size = PPtx(13)
+            r_ct.font.bold = True
+
+        # Asagynda düşündiriş tekst
+        if caption:
+            tx_cc = slide.shapes.add_textbox(Inches(l), Inches(t+h+0.05), Inches(w), Inches(0.35))
+            tf_cc = tx_cc.text_frame; tf_cc.word_wrap = True
+            p_cc = tf_cc.paragraphs[0]; p_cc.alignment = PP_ALIGN.CENTER
+            r_cc = p_cc.add_run(); r_cc.text = caption
+            r_cc.font.name = "Times New Roman"; r_cc.font.size = PPtx(10)
+            r_cc.font.italic = True
+
+        cd = ChartData(); cd.categories = labels
+        cd.add_series("", values)
+        ct_map = {"bar":XL_CHART_TYPE.BAR_CLUSTERED,"pie":XL_CHART_TYPE.PIE,"line":XL_CHART_TYPE.LINE}
+        chart_obj = slide.shapes.add_chart(
+            ct_map.get(ctype, XL_CHART_TYPE.BAR_CLUSTERED),
+            Inches(l), Inches(t), Inches(w), Inches(h), cd).chart
+
+        # Chart başlygy ýok (biziň öz tekst gutujygymyz bar)
+        chart_obj.has_title = False
+
+        # Osi we bellikler görkezel
+        try:
+            plot = chart_obj.plots[0]
+            plot.has_data_labels = True
+            dls = plot.data_labels
+            dls.show_value = True
+            dls.number_format = "0"
+            dls.font.size = PPtx(9)
+            dls.font.bold = True
+        except: pass
+
+        # Legend - pie üçin hökman, bar üçin isleg
+        if ctype == "pie":
+            chart_obj.has_legend = True
+        else:
+            chart_obj.has_legend = True
+            try:
+                chart_obj.legend.position = 2  # right
+                chart_obj.legend.include_in_layout = False
+            except: pass
+
+        return True
     except Exception as e:
         log.warning(f"Grafik goşulmady: {e}"); return False
 
 
-def build_pptx(slides_data: list, theme: str, images: list) -> bytes:
+def build_pptx(slides_data: list, theme: str, images: list, student_info: dict = None) -> bytes:
     PC = _get_palette()   # Her gezek täze reňk!
     prs = Presentation()
     prs.slide_width = Inches(13.33); prs.slide_height = Inches(7.5)
@@ -2241,6 +2286,42 @@ def build_pptx(slides_data: list, theme: str, images: list) -> bytes:
             rn.font.name = "Times New Roman"; rn.font.size = PPtx(9)
             rn.font.color.rgb = PC["light_t"]
             tx_n.text_frame.paragraphs[0].alignment = PP_ALIGN.RIGHT
+
+            # Student maglumaty — sag tarap, vertikal merkez
+            if student_info:
+                _sl = student_info.get("pres_lang","ru")
+                _nm = student_info.get("name","")
+                _cr = student_info.get("course","")
+                _gr = student_info.get("group","")
+                # Dile görä ýazgy
+                if _sl == "ru":
+                    _line1 = f"Выполнил: {_nm}"
+                    _line2 = f"{_cr} курс, {_gr}"
+                elif _sl == "en":
+                    _line1 = f"Prepared by: {_nm}"
+                    _line2 = f"Year {_cr}, Group {_gr}"
+                elif _sl == "tr":
+                    _line1 = f"Hazırlayan: {_nm}"
+                    _line2 = f"{_cr}. sınıf, {_gr}"
+                else:
+                    _line1 = f"Taýarlan: {_nm}"
+                    _line2 = f"{_cr} kurs, {_gr}"
+                # Sag tarapda vertikal merkez, horizontal merkez
+                tx_si = _ptx(slide, 6.5, 5.5, 6.5, 1.6)
+                tf_si = tx_si.text_frame; tf_si.word_wrap = True
+                # 1-nji setir: at-familiýa
+                p_si1 = tf_si.paragraphs[0]
+                p_si1.alignment = PP_ALIGN.CENTER
+                r_si1 = p_si1.add_run(); r_si1.text = _line1
+                r_si1.font.name = "Times New Roman"; r_si1.font.size = PPtx(13)
+                r_si1.font.color.rgb = PC["light_t"]
+                # 2-nji setir: kurs, gruppa
+                p_si2 = tf_si.add_paragraph()
+                p_si2.alignment = PP_ALIGN.CENTER
+                r_si2 = p_si2.add_run(); r_si2.text = _line2
+                r_si2.font.name = "Times New Roman"; r_si2.font.size = PPtx(12)
+                r_si2.font.color.rgb = PC["light_t"]
+                r_si2.font.italic = True
 
         elif is_last:
             _pbg(slide, PC["dark"])
@@ -2306,9 +2387,9 @@ def build_pptx(slides_data: list, theme: str, images: list) -> bytes:
             import random as _rnd2
             pos = _rnd2.choice(_IMG_POS)
             if has_chart and chart_dt:
-                # Grafik sag tarapda
-                tl,tt,tw,th = 0.3,1.35,6.5,5.9
-                _add_chart_pptx(slide, chart_dt, 6.8, 1.4, 6.2, 5.7)
+                # Grafik sag tarapda — başlyk (0.35) we caption (0.4) üçin ýer
+                tl,tt,tw,th = 0.3,1.35,6.3,5.9
+                _add_chart_pptx(slide, chart_dt, 6.7, 1.75, 6.3, 4.85)
             elif img:
                 if pos == "left":
                     _pimg(slide, img, 0, 1.31, 5.1, 6.19); tl,tt,tw,th = 5.3,1.35,7.7,5.9
@@ -2408,10 +2489,11 @@ async def call_deepseek_pptx(theme: str, slides: int, pres_lang: str) -> list:
         f"Создай презентацию из {slides} слайдов на {lang_str} языке.\n"
         f"Тема: «{theme}»\n{lang_instr}\n\n"
         f"Верни JSON массив из {slides} объектов:\n"
-        f'[{{"title":"Заголовок (4-7 слов)","points":["🔹 Пункт 1 — минимум 20 слов, содержательно","📊 Пункт 2 — минимум 20 слов с фактами","✅ Пункт 3 — минимум 20 слов","💡 Пункт 4 — минимум 20 слов"],"image_prompt":"English description for AI image, photorealistic, 15 words","has_chart":false,"chart_data":{{}},"icons":["📌","📊","✅","💡"]}}]\n\n'
+        f'[{{"title":"Заголовок (4-7 слов)","points":["🔹 Пункт 1 — минимум 20 слов","📊 Пункт 2 — минимум 20 слов с фактами","✅ Пункт 3 — минимум 20 слов","💡 Пункт 4 — минимум 20 слов"],"image_prompt":"English description for AI image, photorealistic, 15 words","has_chart":false,"chart_data":{{}}}}]\n\n'
         f"Правила:\n"
         f"- Слайд 1: title=тема, points=['Развёрнутый подзаголовок 25-35 слов'], has_chart=false\n"
-        f"- Слайды 2-3: has_chart=true, chart_data={{\"labels\":[\"A\",\"B\",\"C\"],\"values\":[40,35,25],\"title\":\"...\",\"type\":\"bar\"}}\n"
+        f"- Слайды 2-3: has_chart=true, chart_data={{\"labels\":[\"A\",\"B\",\"C\",\"D\"],\"values\":[75,82,68,90],\"title\":\"Заголовок графика\",\"type\":\"bar\",\"caption\":\"Краткое описание что показывает график\"}}\n"
+        f"- chart_data должен иметь РЕАЛЬНЫЕ данные по теме, не A/B/C/D, а реальные категории\n"
         f"- Слайд {slides}: 4 вывода по 20+ слов, has_chart=false\n"
         f"- Остальные: 3-4 пункта минимум 20 слов, пункты начинаются с эмодзи-иконки\n"
         f"- Только JSON"
@@ -2475,12 +2557,27 @@ async def hp1c_course(cb: CallbackQuery, state: FSMContext):
     n = cb.data.split(":")[1]
     await state.update_data(pptx_course=n)
     d = await state.get_data(); lang = d.get("ui_lang","tk")
-    q = {"tk":"📌 <b>4/5:</b> Prezentasiýa haýsy dilde bolsun?",
-         "ru":"📌 <b>4/5:</b> На каком языке должна быть презентация?",
-         "en":"📌 <b>4/5:</b> In which language should the presentation be?"}
     ok = {"tk":f"✅ {n}-nji kurs!","ru":f"✅ {n}-й курс!","en":f"✅ Year {n}!"}
-    await ask(cb, ok.get(lang,"✅") + "\n\n" + q.get(lang,""), KB_PPTX_LANG)
-    await state.set_state(St.sp2); await cb.answer()
+    q = {"tk":"📌 <b>4/6:</b> Toparыňyzyň adyny ýazyň\n<i>Mysal: EHM-22</i>",
+         "ru":"📌 <b>4/6:</b> Введите название вашей группы\n<i>Пример: ЭВМ-22</i>",
+         "en":"📌 <b>4/6:</b> Enter your group name\n<i>Example: CS-22</i>"}
+    await ask(cb, ok.get(lang,"✅") + "\n\n" + q.get(lang,""))
+    await state.set_state(St.sp1d); await cb.answer()
+
+@router.message(St.sp1d)
+async def hp1d_group(msg: Message, state: FSMContext):
+    d = await state.get_data(); lang = d.get("ui_lang","tk")
+    if len((msg.text or "").strip()) < 2:
+        errs = {"tk":"❌ Iň az 2 harp!","ru":"❌ Минимум 2 символа!","en":"❌ At least 2 chars!"}
+        await msg.answer(errs.get(lang,"❌")); return
+    await state.update_data(pptx_group=msg.text.strip())
+    q = {"tk":"📌 <b>5/6:</b> Prezentasiýa haýsy dilde bolsun?",
+         "ru":"📌 <b>5/6:</b> На каком языке должна быть презентация?",
+         "en":"📌 <b>5/6:</b> In which language should the presentation be?"}
+    ok = {"tk":"✅ Kabul edildi!","ru":"✅ Принято!","en":"✅ Accepted!"}
+    await msg.answer(ok.get(lang,"✅") + "\n\n" + q.get(lang,""),
+                     parse_mode="HTML", reply_markup=KB_PPTX_LANG)
+    await state.set_state(St.sp2)
 
 @router.callback_query(St.sp2, F.data.startswith("plang:"))
 async def hp2_lang(cb: CallbackQuery, state: FSMContext):
@@ -2504,6 +2601,7 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
     pres_lang  = d.get("pptx_lang","ru")
     pptx_name  = d.get("pptx_fullname","")
     pptx_course= d.get("pptx_course","")
+    pptx_group = d.get("pptx_group","")
 
     if uid in ACTIVE_GENERATES:
         await cb.answer("⏳ Eýýäm taýarlanýar!", show_alert=True); return
@@ -2568,13 +2666,17 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
 
         # DeepSeek-iň chart_data-syny chart_slots bolan slaýdlara goý
         for _ci in _chart_slots:
-            if not slides_data[_ci].get("chart_data"):
+            if not slides_data[_ci].get("chart_data") or not slides_data[_ci]["chart_data"].get("labels"):
+                _sld_title = slides_data[_ci].get("title","")
                 slides_data[_ci]["chart_data"] = {
-                    "labels": ["A","B","C","D"],
-                    "values": [_rnd.randint(20,80) for _ in range(4)],
-                    "title": slides_data[_ci].get("title",""),
-                    "type": _rnd.choice(["bar","pie","line"])
+                    "labels": ["I","II","III","IV"],
+                    "values": [_rnd.randint(30,95) for _ in range(4)],
+                    "title": _sld_title,
+                    "type": _rnd.choice(["bar","pie","line"]),
+                    "caption": f"Рис. Показатели по теме: {_sld_title[:40]}"
                 }
+            elif not slides_data[_ci]["chart_data"].get("caption"):
+                slides_data[_ci]["chart_data"]["caption"] = f"Рис. {slides_data[_ci]['chart_data'].get('title','')[:50]}"
             slides_data[_ci]["has_chart"] = True
 
         # Ikon saýlawy — random
@@ -2612,8 +2714,14 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
 
         _s85 = {"tk":"📊 Prezentasiýa ýygnalyp durýar...","ru":"📊 Сборка презентации...","en":"📊 Building presentation..."}.get(_ui_lang,"📊")
         await upd(85,_s85,len(slides_data),len(slides_data))
+        _student_info = {
+            "name": pptx_name,
+            "course": pptx_course,
+            "group": pptx_group,
+            "pres_lang": pres_lang,
+        }
         pptx_bytes = await asyncio.get_running_loop().run_in_executor(
-            None, build_pptx, slides_data, theme, images)
+            None, build_pptx, slides_data, theme, images, _student_info)
 
         safe = re.sub(r"[^\w]","_",theme)[:15]
         fname = f"presentation_{safe}.pptx"
