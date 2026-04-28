@@ -1659,9 +1659,9 @@ async def h02_no(cb: CallbackQuery, state: FSMContext):
     await state.update_data(has_req=False, req_text="")
     d_pre2 = await state.get_data()
     lang_p2 = d_pre2.get("ui_lang","tk")
-    uni_q2 = {"tk":"✅ <b>Adaty GOST görnüşi.</b>\n\n📌 <b>3/13:</b> Uniwersitetiňiziň doly adyny ýazyň\n<i>Mysal: TDEI</i>",
-               "ru":"✅ <b>Стандартный ГОСТ.</b>\n\n📌 <b>3/13:</b> Полное название университета\n<i>Пример: ТГЭИ</i>",
-               "en":"✅ <b>Standard GOST format.</b>\n\n📌 <b>3/13:</b> Full university name\n<i>Example: TSUE</i>"}
+    uni_q2 = {"tk":"✅ <b>Adaty GOST görnüşi.</b>\n\n📌 <b>3/13:</b> Uniwersitetiňiziň doly adyny ýazyň\n<i>Mysal: Turkmen Dowlet Energetika Insituty</i>",
+               "ru":"✅ <b>Стандартный ГОСТ.</b>\n\n📌 <b>3/13:</b> Полное название университета\n<i>Пример: Пермский националный исследовательский университет</i>",
+               "en":"✅ <b>Standard GOST format.</b>\n\n📌 <b>3/13:</b> Full university name\n<i>Example: Uniwersity of Cambridge</i>"}
     await ask(cb, uni_q2.get(lang_p2, uni_q2["tk"]))
     await state.set_state(St.s03); await cb.answer()
 
