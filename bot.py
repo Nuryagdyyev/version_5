@@ -2220,8 +2220,9 @@ def _add_chart_pptx(slide, chart_data: dict, l, t, w, h):
             if ctype == "pie":
                 dls.show_percentage = True
                 dls.show_category_name = True
-                dls.show_value = False
-                dls.number_format = "0%"
+                dls.show_value = True
+                dls.number_format = "0"
+                dls.separator = "\n"
         except: pass
 
         # Y axis label - y_label
@@ -2521,12 +2522,12 @@ async def call_deepseek_pptx(theme: str, slides: int, pres_lang: str) -> list:
         f"Правила:\n"
         f"- Слайд 1: title=тема, points=['Развёрнутый подзаголовок 25-35 слов'], has_chart=false\n"
         f"- Слайды с has_chart=true: chart_data ОБЯЗАТЕЛЬНО содержит:\n"
-        f"  labels — реальные категории по теме (не A/B/C), минимум 4\n"
-        f"  values — реальные числа (проценты, суммы, показатели)\n"
-        f"  title — заголовок графика (что измеряется)\n"
+        f"  labels — реальные категории по теме (не A/B/C), минимум 4, на {lang_str} языке\n"
+        f"  values — реальные числа (проценты, суммы, показатели) — минимум 4 значения\n"
+        f"  title — заголовок графика на {lang_str} языке (что измеряется)\n"
         f"  type — 'bar' (первый график), 'pie' (второй), 'line' (третий и далее)\n"
-        f"  caption — 1-2 предложения объясняющие что показывает график и какой вывод\n"
-        f"  y_label — подпись оси Y (единица измерения, напр. %, млн. руб, кг)\n"
+        f"  caption — 1-2 предложения на {lang_str} языке: что показывает график и вывод\n"
+        f"  y_label — подпись оси Y на {lang_str} языке (%, млн., кг и т.д.)\n"
         f"- Слайд {slides}: 4 вывода по 20+ слов, has_chart=false\n"
         f"- Остальные: 3-4 пункта минимум 20 слов, начинаются с эмодзи-иконки\n"
         f"- Только JSON, никакого текста вне массива"
@@ -2704,23 +2705,57 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
         for _seq_i, _ci in enumerate(sorted(_chart_slots)):
             _forced_type = _ch_types_seq[min(_seq_i, len(_ch_types_seq)-1)]
 
+            _sld_title = slides_data[_ci].get("title","")
+            # Dile görä caption we y_label
+            _cap_tmpl = {
+                "ru": f"Сравнительный анализ: {_sld_title[:40]}. Значения за исследуемый период.",
+                "en": f"Comparative analysis: {_sld_title[:40]}. Values for the study period.",
+                "tr": f"Karşılaştırmalı analiz: {_sld_title[:40]}. Araştırma dönemi verileri.",
+                "tk": f"Deňeşdirme seljerişi: {_sld_title[:40]}. Döwür boýunça görkezijiler.",
+            }.get(pres_lang, f"Analysis: {_sld_title[:40]}")
+            _dyn_tmpl = {
+                "ru": f"Динамика показателей: {slides_data[_ci].get('chart_data',{}).get('title','')[:40]}",
+                "en": f"Indicator dynamics: {slides_data[_ci].get('chart_data',{}).get('title','')[:40]}",
+                "tr": f"Gösterge dinamiği: {slides_data[_ci].get('chart_data',{}).get('title','')[:40]}",
+                "tk": f"Görkezijileriň dinamikasy: {slides_data[_ci].get('chart_data',{}).get('title','')[:40]}",
+            }.get(pres_lang, "")
+            _y_lbl_def = {"ru":"%","en":"%","tr":"%","tk":"%"}.get(pres_lang,"%")
+            _line_labels = {
+                "ru":["2020","2021","2022","2023"],
+                "en":["2020","2021","2022","2023"],
+                "tr":["2020","2021","2022","2023"],
+                "tk":["2020","2021","2022","2023"],
+            }.get(pres_lang,["2020","2021","2022","2023"])
+            _bar_labels = {
+                "ru":["I кв.","II кв.","III кв.","IV кв."],
+                "en":["Q1","Q2","Q3","Q4"],
+                "tr":["Ç1","Ç2","Ç3","Ç4"],
+                "tk":["I ç.","II ç.","III ç.","IV ç."],
+            }.get(pres_lang,["I","II","III","IV"])
+
             if not slides_data[_ci].get("chart_data") or not slides_data[_ci]["chart_data"].get("labels"):
-                _sld_title = slides_data[_ci].get("title","")
-                _vals = [_rnd.randint(30,95) for _ in range(4)]
+                _vals = [_rnd.randint(35,95) for _ in range(4)]
                 slides_data[_ci]["chart_data"] = {
-                    "labels": ["2020","2021","2022","2023"] if _forced_type=="line" else ["I ç.","II ç.","III ç.","IV ç."],
+                    "labels": _line_labels if _forced_type=="line" else _bar_labels,
                     "values": _vals,
                     "title": _sld_title,
                     "type": _forced_type,
-                    "y_label": "%",
-                    "caption": f"Сравнительный анализ: {_sld_title[:40]}. Показатели за исследуемый период."
+                    "y_label": _y_lbl_def,
+                    "caption": _cap_tmpl,
                 }
             else:
                 slides_data[_ci]["chart_data"]["type"] = _forced_type
                 if not slides_data[_ci]["chart_data"].get("caption"):
-                    slides_data[_ci]["chart_data"]["caption"] = f"График показывает динамику: {slides_data[_ci]['chart_data'].get('title','')[:40]}"
+                    slides_data[_ci]["chart_data"]["caption"] = _dyn_tmpl
                 if not slides_data[_ci]["chart_data"].get("y_label"):
-                    slides_data[_ci]["chart_data"]["y_label"] = "%"
+                    slides_data[_ci]["chart_data"]["y_label"] = _y_lbl_def
+                # Labels-lary hem dile görä düzelt
+                existing_labels = slides_data[_ci]["chart_data"].get("labels",[])
+                # Eger labels Kiril harply bolsa we dil EN/TR/TK bolsa — çalyş
+                if pres_lang in ("en","tr","tk") and existing_labels:
+                    import re as _re_ch
+                    if any(_re_ch.search(r"[а-яА-Я]", str(lb)) for lb in existing_labels):
+                        slides_data[_ci]["chart_data"]["labels"] = _line_labels if _forced_type=="line" else _bar_labels
             # has_chart diňe chart_slots üçin
             slides_data[_ci]["has_chart"] = True
 
