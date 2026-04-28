@@ -53,7 +53,7 @@ INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
-PRICE_STARS      = {"referat": 1, "doklad": 1, "pptx": 1}  # Telegram Stars
+PRICE_STARS      = {"referat": 149, "doklad": 149, "pptx": 149}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
@@ -2208,7 +2208,7 @@ def _add_chart_pptx(slide, chart_data: dict, l, t, w, h):
         # Chart başlygy ýok (biziň öz tekst gutujygymyz bar)
         chart_obj.has_title = False
 
-        # Osi we bellikler görkezel
+        # Data labels - sanlary görkezel
         try:
             plot = chart_obj.plots[0]
             plot.has_data_labels = True
@@ -2217,17 +2217,39 @@ def _add_chart_pptx(slide, chart_data: dict, l, t, w, h):
             dls.number_format = "0"
             dls.font.size = PPtx(9)
             dls.font.bold = True
+            if ctype == "pie":
+                dls.show_percentage = True
+                dls.show_category_name = True
+                dls.show_value = False
+                dls.number_format = "0%"
         except: pass
 
-        # Legend - pie üçin hökman, bar üçin isleg
-        if ctype == "pie":
-            chart_obj.has_legend = True
-        else:
-            chart_obj.has_legend = True
-            try:
-                chart_obj.legend.position = 2  # right
-                chart_obj.legend.include_in_layout = False
-            except: pass
+        # Y axis label - y_label
+        _y_lbl = chart_data.get("y_label","")
+        try:
+            if ctype in ("bar","line") and _y_lbl:
+                ax = chart_obj.value_axis
+                ax.has_title = True
+                ax.axis_title.text_frame.text = _y_lbl
+                ax.axis_title.text_frame.paragraphs[0].runs[0].font.size = PPtx(9)
+        except: pass
+
+        # Category axis görkezel
+        try:
+            if ctype in ("bar","line"):
+                cat_ax = chart_obj.category_axis
+                cat_ax.tick_labels.font.size = PPtx(8)
+        except: pass
+
+        # Legend
+        chart_obj.has_legend = True
+        try:
+            if ctype == "pie":
+                chart_obj.legend.position = 2
+            else:
+                chart_obj.legend.position = 2
+            chart_obj.legend.include_in_layout = False
+        except: pass
 
         return True
     except Exception as e:
@@ -2306,15 +2328,18 @@ def build_pptx(slides_data: list, theme: str, images: list, student_info: dict =
                 else:
                     _line1 = f"Taýarlan: {_nm}"
                     _line2 = f"{_cr} kurs, {_gr}"
-                # Sag tarapda vertikal merkez, horizontal merkez
-                tx_si = _ptx(slide, 6.5, 5.5, 6.5, 1.6)
+                # Sag tarapda aşakda — vertikal: orta, horizontal: merkez
+                # Fon = accent reňkli ýuka çyzgy
+                _prect(slide, 6.3, 5.3, 6.7, 0.06, PC["accent"])
+                tx_si = _ptx(slide, 6.3, 5.4, 6.7, 1.7)
                 tf_si = tx_si.text_frame; tf_si.word_wrap = True
                 # 1-nji setir: at-familiýa
                 p_si1 = tf_si.paragraphs[0]
                 p_si1.alignment = PP_ALIGN.CENTER
                 r_si1 = p_si1.add_run(); r_si1.text = _line1
-                r_si1.font.name = "Times New Roman"; r_si1.font.size = PPtx(13)
-                r_si1.font.color.rgb = PC["light_t"]
+                r_si1.font.name = "Times New Roman"; r_si1.font.size = PPtx(14)
+                r_si1.font.bold = False
+                r_si1.font.color.rgb = PRGBColor(0xFF,0xFF,0xFF)
                 # 2-nji setir: kurs, gruppa
                 p_si2 = tf_si.add_paragraph()
                 p_si2.alignment = PP_ALIGN.CENTER
@@ -2492,11 +2517,16 @@ async def call_deepseek_pptx(theme: str, slides: int, pres_lang: str) -> list:
         f'[{{"title":"Заголовок (4-7 слов)","points":["🔹 Пункт 1 — минимум 20 слов","📊 Пункт 2 — минимум 20 слов с фактами","✅ Пункт 3 — минимум 20 слов","💡 Пункт 4 — минимум 20 слов"],"image_prompt":"English description for AI image, photorealistic, 15 words","has_chart":false,"chart_data":{{}}}}]\n\n'
         f"Правила:\n"
         f"- Слайд 1: title=тема, points=['Развёрнутый подзаголовок 25-35 слов'], has_chart=false\n"
-        f"- Слайды 2-3: has_chart=true, chart_data={{\"labels\":[\"A\",\"B\",\"C\",\"D\"],\"values\":[75,82,68,90],\"title\":\"Заголовок графика\",\"type\":\"bar\",\"caption\":\"Краткое описание что показывает график\"}}\n"
-        f"- chart_data должен иметь РЕАЛЬНЫЕ данные по теме, не A/B/C/D, а реальные категории\n"
+        f"- Слайды с has_chart=true: chart_data ОБЯЗАТЕЛЬНО содержит:\n"
+        f"  labels — реальные категории по теме (не A/B/C), минимум 4\n"
+        f"  values — реальные числа (проценты, суммы, показатели)\n"
+        f"  title — заголовок графика (что измеряется)\n"
+        f"  type — 'bar' (первый график), 'pie' (второй), 'line' (третий и далее)\n"
+        f"  caption — 1-2 предложения объясняющие что показывает график и какой вывод\n"
+        f"  y_label — подпись оси Y (единица измерения, напр. %, млн. руб, кг)\n"
         f"- Слайд {slides}: 4 вывода по 20+ слов, has_chart=false\n"
-        f"- Остальные: 3-4 пункта минимум 20 слов, пункты начинаются с эмодзи-иконки\n"
-        f"- Только JSON"
+        f"- Остальные: 3-4 пункта минимум 20 слов, начинаются с эмодзи-иконки\n"
+        f"- Только JSON, никакого текста вне массива"
     )
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
                "Content-Type": "application/json", "Accept-Encoding": "identity"}
@@ -2666,17 +2696,29 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
 
         # DeepSeek-iň chart_data-syny chart_slots bolan slaýdlara goý
         for _ci in _chart_slots:
+            # chart index - haýsy grafik (bar=0, pie=1, line=2+)
+            _ch_idx = list(_chart_slots).index(_ci) if _ci in _chart_slots else 0
+            _ch_types = ["bar","pie","line","line"]
+            _forced_type = _ch_types[min(_ch_idx, len(_ch_types)-1)]
+
             if not slides_data[_ci].get("chart_data") or not slides_data[_ci]["chart_data"].get("labels"):
                 _sld_title = slides_data[_ci].get("title","")
+                _vals = [_rnd.randint(30,95) for _ in range(4)]
                 slides_data[_ci]["chart_data"] = {
-                    "labels": ["I","II","III","IV"],
-                    "values": [_rnd.randint(30,95) for _ in range(4)],
+                    "labels": ["2020","2021","2022","2023"] if _forced_type=="line" else ["I","II","III","IV"],
+                    "values": _vals,
                     "title": _sld_title,
-                    "type": _rnd.choice(["bar","pie","line"]),
-                    "caption": f"Рис. Показатели по теме: {_sld_title[:40]}"
+                    "type": _forced_type,
+                    "y_label": "%",
+                    "caption": f"Сравнительный анализ по теме: {_sld_title[:35]}. Данные за период исследования."
                 }
-            elif not slides_data[_ci]["chart_data"].get("caption"):
-                slides_data[_ci]["chart_data"]["caption"] = f"Рис. {slides_data[_ci]['chart_data'].get('title','')[:50]}"
+            else:
+                # Grafik tipini tertibe görä üýtget
+                slides_data[_ci]["chart_data"]["type"] = _forced_type
+                if not slides_data[_ci]["chart_data"].get("caption"):
+                    slides_data[_ci]["chart_data"]["caption"] = f"График показывает: {slides_data[_ci]['chart_data'].get('title','')[:45]}"
+                if not slides_data[_ci]["chart_data"].get("y_label"):
+                    slides_data[_ci]["chart_data"]["y_label"] = "%"
             slides_data[_ci]["has_chart"] = True
 
         # Ikon saýlawy — random
