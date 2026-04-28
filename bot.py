@@ -53,7 +53,7 @@ INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
-PRICE_STARS      = {"referat": 1, "doklad": 1, "pptx": 1}  # Telegram Stars
+PRICE_STARS      = {"referat": 149, "doklad": 149, "pptx": 149}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
@@ -2328,24 +2328,27 @@ def build_pptx(slides_data: list, theme: str, images: list, student_info: dict =
                 else:
                     _line1 = f"Taýarlan: {_nm}"
                     _line2 = f"{_cr} kurs, {_gr}"
-                # Sag tarapda aşakda — vertikal: orta, horizontal: merkez
-                # Fon = accent reňkli ýuka çyzgy
-                _prect(slide, 6.3, 5.3, 6.7, 0.06, PC["accent"])
-                tx_si = _ptx(slide, 6.3, 5.4, 6.7, 1.7)
+                # Aşak-sag burçda, accent fon içinde, ak tekst
+                # Fon gutusy
+                _si_bg = _prect(slide, 6.0, 5.9, 7.0, 1.35, PC["accent"])
+                # Ýuka ak çyzgy ýokarynda
+                _prect(slide, 6.0, 5.9, 7.0, 0.04, PRGBColor(0xFF,0xFF,0xFF))
+                tx_si = _ptx(slide, 6.1, 6.0, 6.8, 1.2)
                 tf_si = tx_si.text_frame; tf_si.word_wrap = True
-                # 1-nji setir: at-familiýa
+                # 1-nji setir: at-familiýa (ak, uly)
                 p_si1 = tf_si.paragraphs[0]
                 p_si1.alignment = PP_ALIGN.CENTER
                 r_si1 = p_si1.add_run(); r_si1.text = _line1
-                r_si1.font.name = "Times New Roman"; r_si1.font.size = PPtx(14)
-                r_si1.font.bold = False
+                r_si1.font.name = "Times New Roman"; r_si1.font.size = PPtx(15)
+                r_si1.font.bold = True
                 r_si1.font.color.rgb = PRGBColor(0xFF,0xFF,0xFF)
-                # 2-nji setir: kurs, gruppa
+                # 2-nji setir: kurs, gruppa (ýagty, kursiv)
                 p_si2 = tf_si.add_paragraph()
                 p_si2.alignment = PP_ALIGN.CENTER
+                p_si2.space_before = PPtx(4)
                 r_si2 = p_si2.add_run(); r_si2.text = _line2
-                r_si2.font.name = "Times New Roman"; r_si2.font.size = PPtx(12)
-                r_si2.font.color.rgb = PC["light_t"]
+                r_si2.font.name = "Times New Roman"; r_si2.font.size = PPtx(13)
+                r_si2.font.color.rgb = PRGBColor(0xFF,0xFF,0xFF)
                 r_si2.font.italic = True
 
         elif is_last:
@@ -2692,34 +2695,38 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
         _rnd.shuffle(_mid)
         _img_slots   = set(_mid[:n_img])
         _chart_slots = set(_mid[n_img:n_img+n_chart])
+        # img_slots we chart_slots kesişmesin
+        _chart_slots = _chart_slots - _img_slots
         # Galanlar - diňe ikon we tekst
 
-        # DeepSeek-iň chart_data-syny chart_slots bolan slaýdlara goý
-        for _ci in _chart_slots:
-            # chart index - haýsy grafik (bar=0, pie=1, line=2+)
-            _ch_idx = list(_chart_slots).index(_ci) if _ci in _chart_slots else 0
-            _ch_types = ["bar","pie","line","line"]
-            _forced_type = _ch_types[min(_ch_idx, len(_ch_types)-1)]
+        # Grafik tiplerini tertipli belirle: bar → pie → line → line...
+        _ch_types_seq = ["bar","pie","line","line","line"]
+        for _seq_i, _ci in enumerate(sorted(_chart_slots)):
+            _forced_type = _ch_types_seq[min(_seq_i, len(_ch_types_seq)-1)]
 
             if not slides_data[_ci].get("chart_data") or not slides_data[_ci]["chart_data"].get("labels"):
                 _sld_title = slides_data[_ci].get("title","")
                 _vals = [_rnd.randint(30,95) for _ in range(4)]
                 slides_data[_ci]["chart_data"] = {
-                    "labels": ["2020","2021","2022","2023"] if _forced_type=="line" else ["I","II","III","IV"],
+                    "labels": ["2020","2021","2022","2023"] if _forced_type=="line" else ["I ç.","II ç.","III ç.","IV ç."],
                     "values": _vals,
                     "title": _sld_title,
                     "type": _forced_type,
                     "y_label": "%",
-                    "caption": f"Сравнительный анализ по теме: {_sld_title[:35]}. Данные за период исследования."
+                    "caption": f"Сравнительный анализ: {_sld_title[:40]}. Показатели за исследуемый период."
                 }
             else:
-                # Grafik tipini tertibe görä üýtget
                 slides_data[_ci]["chart_data"]["type"] = _forced_type
                 if not slides_data[_ci]["chart_data"].get("caption"):
-                    slides_data[_ci]["chart_data"]["caption"] = f"График показывает: {slides_data[_ci]['chart_data'].get('title','')[:45]}"
+                    slides_data[_ci]["chart_data"]["caption"] = f"График показывает динамику: {slides_data[_ci]['chart_data'].get('title','')[:40]}"
                 if not slides_data[_ci]["chart_data"].get("y_label"):
                     slides_data[_ci]["chart_data"]["y_label"] = "%"
+            # has_chart diňe chart_slots üçin
             slides_data[_ci]["has_chart"] = True
+
+        # img_slots slaýdlarynda has_chart aýyr (surat bolmaly)
+        for _ii in _img_slots:
+            slides_data[_ii]["has_chart"] = False
 
         # Ikon saýlawy — random
         _ICONS = ["📌","📊","✅","💡","🔹","🎯","🔑","📈","🔷","⚡","🌟","🔶","💎","🏆","📝"]
