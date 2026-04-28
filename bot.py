@@ -1,4 +1,3 @@
-Content is user-generated and unverified.
 """
 AKADEMIK IŞLER BOT — ŞAHSY WERSIÝA (tölegsiz)
 Bot → TÜRKMEN dilinde | Faýl → HEMIŞE RUS dilinde
@@ -53,7 +52,7 @@ ADMIN_IDS        = [8512644114, 7404431806]
 INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
-PRICE            = {"referat": 149, "doklad": 149, "pptx": 149}  # rubl
+PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
 PRICE_STARS      = {"referat": 1, "doklad": 1, "pptx": 1}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
@@ -564,7 +563,6 @@ class St(StatesGroup):
     sp1  = State()  # tema
     sp1b = State()  # at-familiýa
     sp1c = State()  # kurs
-    sp1d = State()  # topar (group)
     sp2  = State()  # dil
     sp3  = State()  # slayd sany
 
@@ -832,8 +830,7 @@ def build_prompt(d: dict) -> str:
         f"• только русский язык\n"
         f"• НЕТ подразделов 1.1/1.2\n"
         f"• Все перечисления нумеруй: 1. 2. 3. (не используй маркеры •/—)\n"
-        f"• Строго используй маркеры: ##ВВЕДЕНИЕ## ##ГЛАВА_1## ##ЗАКЛЮЧЕНИЕ## ##СПИСОК_ЛИТЕРАТУРЫ##\n"
-        f"• Начинай СРАЗУ с ##ВВЕДЕНИЕ## без предисловий"
+        f"• Начинай с ##ВВЕДЕНИЕ##:"
     )
 
 
@@ -906,9 +903,6 @@ async def call_deepseek(d: dict, on_progress) -> str:
         system_prompt = (
             "Ты профессиональный академический автор. "
             "Пиши ТОЛЬКО на русском языке. "
-            "ОБЯЗАТЕЛЬНО используй ТОЧНО эти маркеры без изменений: "
-            "##ВВЕДЕНИЕ## ##ГЛАВА_1## ##ГЛАВА_2## ##ЗАКЛЮЧЕНИЕ## ##СПИСОК_ЛИТЕРАТУРЫ## — "
-            "без пробелов, без двоеточий, без звёздочек вокруг них. "
             "Если в начале задания есть раздел «СТУДЕНТИҢ ÝÖRITE ТАЛАРЫ» — "
             "это особые требования студента, их ОБЯЗАТЕЛЬНО нужно выполнить полностью. "
             "Все перечисления нумеруй: 1. 2. 3. — никаких маркеров •/—. "
@@ -920,7 +914,7 @@ async def call_deepseek(d: dict, on_progress) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_content_final},
         ],
-        "max_tokens":  8000,
+        "max_tokens":  6000,
         "temperature": 0.7,
         "stream":      False,
     }
@@ -1005,9 +999,6 @@ async def call_deepseek(d: dict, on_progress) -> str:
 
 
 def parse_ai(raw: str, secs: int) -> dict:
-    # ── Маркерleri normallaşdyr: ## ВВЕДЕНИЕ ## / ##ВВЕДЕНИЕ:## / **##ВВЕДЕНИЕ##** → ##ВВЕДЕНИЕ##
-    raw = re.sub(r'\*{0,2}#{2}\s*([\wА-ЯЁа-яё_]+)\s*#{2}\*{0,2}:?', lambda m: f'##{m.group(1).strip()}##', raw)
-
     def _between(text, start, *ends):
         s = text.find(start)
         if s == -1: return ""
@@ -1031,22 +1022,6 @@ def parse_ai(raw: str, secs: int) -> dict:
         chapters.append({"title": title, "lines": body})
     conc_raw = _between(raw, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
     src_raw  = _between(raw, "##СПИСОК_ЛИТЕРАТУРЫ##")
-
-    # ── Fallback: маркер tapylmasa tutuş teksti bölüşdir ──
-    if not intro_raw and not chapters:
-        log.warning("parse_ai: маркеры не найдены — используем fallback-разбивку")
-        all_lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
-        n = len(all_lines)
-        intro_lines = all_lines[:max(1, n // 5)]
-        mid_lines   = all_lines[max(1, n // 5): max(2, n * 4 // 5)]
-        conc_lines  = all_lines[max(2, n * 4 // 5):]
-        chunk = max(1, len(mid_lines) // secs)
-        chs_fb = []
-        for i in range(secs):
-            sl = mid_lines[i*chunk:(i+1)*chunk] if i < secs-1 else mid_lines[i*chunk:]
-            chs_fb.append({"title": f"{i+1}. Глава {i+1}", "lines": sl})
-        return dict(intro=intro_lines, chapters=chs_fb, conclusion=conc_lines, sources=[])
-
     raw_srcs = [ln.strip() for ln in src_raw.splitlines() if ln.strip() and not ln.strip().startswith("##")]
     sources: list = []
     for ln in raw_srcs:
@@ -1412,7 +1387,7 @@ async def deliver(uid: int, bot: Bot):
     info = PENDING.pop(uid)
     d    = info["data"]
     svc  = d.get("service", "referat")
-    price = PRICE_STARS.get(svc, 149)
+    price = PRICE_STARS.get(svc, 159)
     svc_nm = {"referat":"Referat 📄","doklad":"Doklad 🎤","pptx":"Prezentasiýa 📊"}.get(svc, svc)
 
     # Ulanyjyny DB-ä goş (ýok bolsa)
@@ -1455,7 +1430,7 @@ async def deliver(uid: int, bot: Bot):
         return
 
     # Galan sargytlar — Stars töleg
-    stars = PRICE_STARS.get(svc, 149)
+    stars = PRICE_STARS.get(svc, 159)
     oid   = _db_add_order(uid, svc, d.get("theme",""), stars, is_free=False, status="pending")
     PAYMENT_PENDING[uid] = {**info, "order_id": oid}
     lang  = d.get("ui_lang","tk")
@@ -2214,16 +2189,11 @@ def _add_chart_pptx(slide, chart_data: dict, l, t, w, h):
         log.warning(f"Grafik goşulmady: {e}"); return False
 
 
-def build_pptx(slides_data: list, theme: str, images: list, student_info: dict = None) -> bytes:
+def build_pptx(slides_data: list, theme: str, images: list) -> bytes:
     PC = _get_palette()   # Her gezek täze reňk!
     prs = Presentation()
     prs.slide_width = Inches(13.33); prs.slide_height = Inches(7.5)
     blank = prs.slide_layouts[6]; total = len(slides_data)
-    _si = student_info or {}
-    _si_name   = _si.get("name","")
-    _si_course = _si.get("course","")
-    _si_group  = _si.get("group","")
-    _si_lang   = _si.get("lang","ru")
 
     for idx, sld in enumerate(slides_data):
         slide   = prs.slides.add_slide(blank)
@@ -2505,26 +2475,12 @@ async def hp1c_course(cb: CallbackQuery, state: FSMContext):
     n = cb.data.split(":")[1]
     await state.update_data(pptx_course=n)
     d = await state.get_data(); lang = d.get("ui_lang","tk")
-    q = {"tk":f"✅ {n}-nji kurs!\n\n📌 <b>4/5:</b> Topar adyňyzy ýazyň\n<i>Mysal: EHM-22</i>",
-         "ru":f"✅ {n}-й курс!\n\n📌 <b>4/5:</b> Введите название вашей группы\n<i>Пример: ЭВМ-22</i>",
-         "en":f"✅ Year {n}!\n\n📌 <b>4/5:</b> Enter your group name\n<i>Example: CS-22</i>"}
-    await ask(cb, q.get(lang,""))
-    await state.set_state(St.sp1d); await cb.answer()
-
-@router.message(St.sp1d)
-async def hp1d_group(msg: Message, state: FSMContext):
-    d = await state.get_data(); lang = d.get("ui_lang","tk")
-    if len((msg.text or "").strip()) < 2:
-        errs = {"tk":"❌ Iň az 2 harp ýazyň!","ru":"❌ Минимум 2 символа!","en":"❌ At least 2 chars!"}
-        await msg.answer(errs.get(lang,"❌")); return
-    await state.update_data(pptx_group=msg.text.strip())
-    q = {"tk":"✅ Kabul edildi!\n\n📌 <b>5/6:</b> Prezentasiýa haýsy dilde bolsun?",
-         "ru":"✅ Принято!\n\n📌 <b>5/6:</b> На каком языке должна быть презентация?",
-         "en":"✅ Accepted!\n\n📌 <b>5/6:</b> In which language should the presentation be?"}
-    ok = {"tk":"✅ Topar kabul edildi!","ru":"✅ Группа принята!","en":"✅ Group accepted!"}
-    await msg.answer(ok.get(lang,"✅") + "\n\n" + q.get(lang,""),
-                     parse_mode="HTML", reply_markup=KB_PPTX_LANG)
-    await state.set_state(St.sp2)
+    q = {"tk":"📌 <b>4/5:</b> Prezentasiýa haýsy dilde bolsun?",
+         "ru":"📌 <b>4/5:</b> На каком языке должна быть презентация?",
+         "en":"📌 <b>4/5:</b> In which language should the presentation be?"}
+    ok = {"tk":f"✅ {n}-nji kurs!","ru":f"✅ {n}-й курс!","en":f"✅ Year {n}!"}
+    await ask(cb, ok.get(lang,"✅") + "\n\n" + q.get(lang,""), KB_PPTX_LANG)
+    await state.set_state(St.sp2); await cb.answer()
 
 @router.callback_query(St.sp2, F.data.startswith("plang:"))
 async def hp2_lang(cb: CallbackQuery, state: FSMContext):
@@ -2532,9 +2488,9 @@ async def hp2_lang(cb: CallbackQuery, state: FSMContext):
     await state.update_data(pptx_lang=pl)
     d = await state.get_data(); lang = d.get("ui_lang","tk")
     lang_name = {"ru":"🇷🇺 Rusça / Русский","en":"🇬🇧 Iňlisçe / English","tr":"🇹🇷 Türkçe"}.get(pl,"?")
-    q = {"tk":f"✅ {lang_name} saýlandy!\n\n📌 <b>6/6:</b> Näçe slaýd bolmaly?",
-         "ru":f"✅ {lang_name} выбран!\n\n📌 <b>6/6:</b> Сколько слайдов?",
-         "en":f"✅ {lang_name} selected!\n\n📌 <b>6/6:</b> How many slides?"}
+    q = {"tk":f"✅ {lang_name} saýlandy!\n\n📌 <b>5/5:</b> Näçe slaýd bolmaly?",
+         "ru":f"✅ {lang_name} выбран!\n\n📌 <b>5/5:</b> Сколько слайдов?",
+         "en":f"✅ {lang_name} selected!\n\n📌 <b>5/5:</b> How many slides?"}
     await ask(cb, q.get(lang,""), KB_PPTX_SLIDES)
     await state.set_state(St.sp3); await cb.answer()
 
@@ -2548,7 +2504,6 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
     pres_lang  = d.get("pptx_lang","ru")
     pptx_name  = d.get("pptx_fullname","")
     pptx_course= d.get("pptx_course","")
-    pptx_group = d.get("pptx_group","")
 
     if uid in ACTIVE_GENERATES:
         await cb.answer("⏳ Eýýäm taýarlanýar!", show_alert=True); return
@@ -2657,14 +2612,8 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
 
         _s85 = {"tk":"📊 Prezentasiýa ýygnalyp durýar...","ru":"📊 Сборка презентации...","en":"📊 Building presentation..."}.get(_ui_lang,"📊")
         await upd(85,_s85,len(slides_data),len(slides_data))
-        student_info = {
-            "name": pptx_name,
-            "course": pptx_course,
-            "group": pptx_group,
-            "lang": pres_lang,
-        }
         pptx_bytes = await asyncio.get_running_loop().run_in_executor(
-            None, build_pptx, slides_data, theme, images, student_info)
+            None, build_pptx, slides_data, theme, images)
 
         safe = re.sub(r"[^\w]","_",theme)[:15]
         fname = f"presentation_{safe}.pptx"
@@ -2699,15 +2648,15 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
                 "tk": (f"✅ <b>Prezentasiýaňyz taýar boldy!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} slaýd\n\n"
                        f"⭐ <b>Töleg üçin aşakdaky düwmä basyň:</b>\n"
-                       f"💰 Baha: <b>{PRICE_STARS['pptx']} Telegram Stars</b>"),
+                       f"💰 Baha: <b>159 Telegram Stars</b>"),
                 "ru": (f"✅ <b>Ваша презентация готова!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} слайдов\n\n"
                        f"⭐ <b>Для оплаты нажмите кнопку ниже:</b>\n"
-                       f"💰 Стоимость: <b>{PRICE_STARS['pptx']} Telegram Stars</b>"),
+                       f"💰 Стоимость: <b>159 Telegram Stars</b>"),
                 "en": (f"✅ <b>Your presentation is ready!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} slides\n\n"
                        f"⭐ <b>Press the button below to pay:</b>\n"
-                       f"💰 Price: <b>{PRICE_STARS['pptx']} Telegram Stars</b>"),
+                       f"💰 Price: <b>159 Telegram Stars</b>"),
             }
             await bot.edit_message_text(
                 pay_msgs.get(lang_p, pay_msgs["tk"]),
@@ -2774,7 +2723,7 @@ async def h_stars_paid(msg: Message, bot: Bot):
     svc   = d.get("service","referat")
     theme = d.get("theme","")
     lang  = d.get("ui_lang","tk")
-    stars = PRICE_STARS.get(svc, 149)  # hakyky: 149
+    stars = PRICE_STARS.get(svc, 2)  # synag üçin 2, hakyky: 159
     oid   = info.get("order_id")
     if oid: _db_update_order_status(oid,"delivered")
     _db_mark_paid(uid, stars)
