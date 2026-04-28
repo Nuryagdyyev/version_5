@@ -49,7 +49,7 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 REDIS_URL        = os.getenv("REDIS_URL", None)
 
 ADMIN_IDS        = [8512644114, 7404431806]
-INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
+INTRO_VIDEO_URL  = "https://youtu.be/H6vFevTXuCk?si=aD2jKggMEdJSAaZm"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
@@ -1660,7 +1660,7 @@ async def h02_no(cb: CallbackQuery, state: FSMContext):
     d_pre2 = await state.get_data()
     lang_p2 = d_pre2.get("ui_lang","tk")
     uni_q2 = {"tk":"✅ <b>Adaty GOST görnüşi.</b>\n\n📌 <b>3/13:</b> Uniwersitetiňiziň doly adyny ýazyň\n<i>Mysal: Turkmen Dowlet Energetika Insituty</i>",
-               "ru":"✅ <b>Стандартный ГОСТ.</b>\n\n📌 <b>3/13:</b> Полное название университета\n<i>Пример: Пермский националный исследовательский университет</i>",
+               "ru":"✅ <b>Стандартный ГОСТ.</b>\n\n📌 <b>3/13:</b> Полное название университета\n<i>Пример: Пермский националный исследовательский политехнический университет</i>",
                "en":"✅ <b>Standard GOST format.</b>\n\n📌 <b>3/13:</b> Full university name\n<i>Example: Uniwersity of Cambridge</i>"}
     await ask(cb, uni_q2.get(lang_p2, uni_q2["tk"]))
     await state.set_state(St.s03); await cb.answer()
