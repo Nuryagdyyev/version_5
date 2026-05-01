@@ -2209,84 +2209,120 @@ def _add_chart_pptx(slide, chart_data: dict, l, t, w, h):
     try:
         from pptx.chart.data import ChartData
         from pptx.enum.chart import XL_CHART_TYPE
-        from pptx.util import Pt as _Pt2
-        labels  = chart_data.get("labels",["A","B","C"])
-        values  = chart_data.get("values",[40,35,25])
-        title   = chart_data.get("title","")
-        ctype   = chart_data.get("type","bar")
-        caption = chart_data.get("caption","")   # asagyndaky düşündiriş
+        from pptx.enum.chart import XL_LEGEND_POSITION
+        from pptx.oxml.ns import qn as _cqn
+        from lxml import etree as _etree
 
-        # Ýokarda başlyk tekst gutujygy (chart içindäki title däl)
+        labels  = chart_data.get("labels", ["A","B","C","D"])
+        values  = chart_data.get("values", [40,35,25,20])
+        title   = chart_data.get("title",  "")
+        ctype   = chart_data.get("type",   "bar")
+        caption = chart_data.get("caption","")
+        y_label = chart_data.get("y_label","")
+        x_label = chart_data.get("x_label","")
+
+        # Başlyk - grafikiň ýokarynda, galyň
+        _title_h = 0.38
+        _cap_h   = 0.52
+        _chart_t = t + _title_h
+        _chart_h = h - _title_h - _cap_h
+
         if title:
-            tx_ct = slide.shapes.add_textbox(Inches(l), Inches(t-0.35), Inches(w), Inches(0.35))
-            tf_ct = tx_ct.text_frame; tf_ct.word_wrap = True
-            p_ct = tf_ct.paragraphs[0]; p_ct.alignment = PP_ALIGN.CENTER
-            r_ct = p_ct.add_run(); r_ct.text = title
-            r_ct.font.name = "Times New Roman"; r_ct.font.size = PPtx(13)
-            r_ct.font.bold = True
+            tx_t = slide.shapes.add_textbox(
+                Inches(l), Inches(t), Inches(w), Inches(_title_h))
+            tf_t = tx_t.text_frame; tf_t.word_wrap = True
+            p_t = tf_t.paragraphs[0]; p_t.alignment = PP_ALIGN.CENTER
+            r_t = p_t.add_run(); r_t.text = title
+            r_t.font.name = "Times New Roman"
+            r_t.font.size = PPtx(13); r_t.font.bold = True
 
-        # Asagynda düşündiriş tekst
-        if caption:
-            tx_cc = slide.shapes.add_textbox(Inches(l), Inches(t+h+0.05), Inches(w), Inches(0.35))
-            tf_cc = tx_cc.text_frame; tf_cc.word_wrap = True
-            p_cc = tf_cc.paragraphs[0]; p_cc.alignment = PP_ALIGN.CENTER
-            r_cc = p_cc.add_run(); r_cc.text = caption
-            r_cc.font.name = "Times New Roman"; r_cc.font.size = PPtx(10)
-            r_cc.font.italic = True
-
-        cd = ChartData(); cd.categories = labels
+        # Grafik
+        cd = ChartData()
+        cd.categories = labels
         cd.add_series("", values)
-        ct_map = {"bar":XL_CHART_TYPE.BAR_CLUSTERED,"pie":XL_CHART_TYPE.PIE,"line":XL_CHART_TYPE.LINE}
-        chart_obj = slide.shapes.add_chart(
-            ct_map.get(ctype, XL_CHART_TYPE.BAR_CLUSTERED),
-            Inches(l), Inches(t), Inches(w), Inches(h), cd).chart
+        ct_map = {
+            "bar":  XL_CHART_TYPE.COLUMN_CLUSTERED,  # dik sütün (excel bar)
+            "pie":  XL_CHART_TYPE.PIE,
+            "line": XL_CHART_TYPE.LINE_MARKERS,
+        }
+        chart_shape = slide.shapes.add_chart(
+            ct_map.get(ctype, XL_CHART_TYPE.COLUMN_CLUSTERED),
+            Inches(l), Inches(_chart_t), Inches(w), Inches(_chart_h), cd)
+        chart_obj = chart_shape.chart
 
-        # Chart başlygy ýok (biziň öz tekst gutujygymyz bar)
+        # Grafik içindäki başlyk öç
         chart_obj.has_title = False
 
-        # Data labels - sanlary görkezel
+        # ── Data labels (sütündäki sanlar) ──
         try:
             plot = chart_obj.plots[0]
             plot.has_data_labels = True
             dls = plot.data_labels
-            dls.show_value = True
-            dls.number_format = "0"
-            dls.font.size = PPtx(9)
+            dls.font.size = PPtx(10)
             dls.font.bold = True
             if ctype == "pie":
-                dls.show_percentage = True
-                dls.show_category_name = True
-                dls.show_value = True
-                dls.number_format = "0"
-                dls.separator = "\n"
+                dls.show_percentage   = True
+                dls.show_category_name= True
+                dls.show_value        = False
+                dls.number_format     = "0%"
+            else:
+                dls.show_value        = True
+                dls.show_category_name= False
+                dls.number_format     = "0"
         except: pass
 
-        # Y axis label - y_label
-        _y_lbl = chart_data.get("y_label","")
-        try:
-            if ctype in ("bar","line") and _y_lbl:
-                ax = chart_obj.value_axis
-                ax.has_title = True
-                ax.axis_title.text_frame.text = _y_lbl
-                ax.axis_title.text_frame.paragraphs[0].runs[0].font.size = PPtx(9)
-        except: pass
-
-        # Category axis görkezel
+        # ── Value axis (Y oku) ──
         try:
             if ctype in ("bar","line"):
-                cat_ax = chart_obj.category_axis
-                cat_ax.tick_labels.font.size = PPtx(8)
+                v_ax = chart_obj.value_axis
+                v_ax.tick_labels.font.size = PPtx(9)
+                v_ax.tick_labels.font.bold = False
+                if y_label:
+                    v_ax.has_title = True
+                    v_ax.axis_title.text_frame.text = y_label
+                    for para in v_ax.axis_title.text_frame.paragraphs:
+                        for run in para.runs:
+                            run.font.size = PPtx(9)
+                            run.font.bold = False
         except: pass
 
-        # Legend
-        chart_obj.has_legend = True
+        # ── Category axis (X oku) ──
         try:
-            if ctype == "pie":
-                chart_obj.legend.position = 2
-            else:
-                chart_obj.legend.position = 2
-            chart_obj.legend.include_in_layout = False
+            if ctype in ("bar","line"):
+                c_ax = chart_obj.category_axis
+                c_ax.tick_labels.font.size = PPtx(9)
+                c_ax.tick_labels.font.bold = False
+                if x_label:
+                    c_ax.has_title = True
+                    c_ax.axis_title.text_frame.text = x_label
+                    for para in c_ax.axis_title.text_frame.paragraphs:
+                        for run in para.runs:
+                            run.font.size = PPtx(9)
         except: pass
+
+        # ── Legend ──
+        try:
+            chart_obj.has_legend = True
+            chart_obj.legend.include_in_layout = False
+            if ctype == "pie":
+                chart_obj.legend.position = XL_LEGEND_POSITION.RIGHT
+            else:
+                chart_obj.legend.position = XL_LEGEND_POSITION.BOTTOM
+            for para in chart_obj.legend.text_frame.paragraphs if hasattr(chart_obj.legend,"text_frame") else []:
+                for run in para.runs:
+                    run.font.size = PPtx(9)
+        except: pass
+
+        # ── Caption (asagynda düşündiriş) ──
+        _cap_y = _chart_t + _chart_h + 0.04
+        if caption:
+            tx_c = slide.shapes.add_textbox(
+                Inches(l), Inches(_cap_y), Inches(w), Inches(_cap_h))
+            tf_c = tx_c.text_frame; tf_c.word_wrap = True
+            p_c = tf_c.paragraphs[0]; p_c.alignment = PP_ALIGN.CENTER
+            r_c = p_c.add_run(); r_c.text = caption
+            r_c.font.name = "Times New Roman"
+            r_c.font.size = PPtx(10); r_c.font.italic = True
 
         return True
     except Exception as e:
@@ -2882,12 +2918,19 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
 
             if not slides_data[_ci].get("chart_data") or not slides_data[_ci]["chart_data"].get("labels"):
                 _vals = [_rnd.randint(35,95) for _ in range(4)]
+                _x_lbl_def = {
+                    "ru": "Период" if _forced_type=="line" else "Категории",
+                    "en": "Period"  if _forced_type=="line" else "Categories",
+                    "tr": "Dönem"   if _forced_type=="line" else "Kategoriler",
+                    "tk": "Döwür"   if _forced_type=="line" else "Kategoriýalar",
+                }.get(pres_lang,"")
                 slides_data[_ci]["chart_data"] = {
                     "labels": _line_labels if _forced_type=="line" else _bar_labels,
                     "values": _vals,
                     "title": _sld_title,
                     "type": _forced_type,
                     "y_label": _y_lbl_def,
+                    "x_label": _x_lbl_def,
                     "caption": _cap_tmpl,
                 }
             else:
