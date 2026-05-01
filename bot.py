@@ -53,7 +53,7 @@ INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
-PRICE_STARS      = {"referat": 1, "doklad": 1, "pptx": 1}  # Telegram Stars
+PRICE_STARS      = {"referat": 149, "doklad": 149, "pptx": 149}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
@@ -1677,9 +1677,9 @@ async def h02_no(cb: CallbackQuery, state: FSMContext):
     await state.update_data(has_req=False, req_text="")
     d_pre2 = await state.get_data()
     lang_p2 = d_pre2.get("ui_lang","tk")
-    uni_q2 = {"tk":"✅ <b>Adaty GOST görnüşi.</b>\n\n📌 <b>3/13:</b> Uniwersitetiňiziň doly adyny ýazyň\n<i>Mysal: TDEI</i>",
-               "ru":"✅ <b>Стандартный ГОСТ.</b>\n\n📌 <b>3/13:</b> Полное название университета\n<i>Пример: ТГЭИ</i>",
-               "en":"✅ <b>Standard GOST format.</b>\n\n📌 <b>3/13:</b> Full university name\n<i>Example: TSUE</i>"}
+    uni_q2 = {"tk":"✅ <b>Adaty GOST görnüşi.</b>\n\n📌 <b>3/13:</b> Uniwersitetiňiziň doly adyny ýazyň\n<i>Mysal: Пермский национальный исследовательский политехнический университет</i>",
+               "ru":"✅ <b>Стандартный ГОСТ.</b>\n\n📌 <b>3/13:</b> Полное название университета\n<i>Пример: Пермский национальный исследовательский политехнический университет</i>",
+               "en":"✅ <b>Standard GOST format.</b>\n\n📌 <b>3/13:</b> Full university name\n<i>Example: Пермский национальный исследовательский политехнический университет</i>"}
     await ask(cb, uni_q2.get(lang_p2, uni_q2["tk"]))
     await state.set_state(St.s03); await cb.answer()
 
@@ -1803,9 +1803,9 @@ async def h10(cb: CallbackQuery, state: FSMContext):
 async def h11_def(cb: CallbackQuery, state: FSMContext):
     await state.update_data(spacing="default")
     d_11 = await state.get_data(); lang_11 = d_11.get("ui_lang","tk")
-    q11 = {"tk":"✅ Setirler aralygy <b>1.5</b> saýlandy!\n\n📌 <b>12/13:</b> Näçe sahypa?\n\n💡 <i>7—17 maslahat</i>\nSan ýazyň <i>(mysal: 12)</i>:",
-           "ru":"✅ Интервал <b>1.5</b> выбран!\n\n📌 <b>12/13:</b> Сколько страниц?\n\n💡 <i>7—17 рекомендуется</i>\nВведите число <i>(пример: 12)</i>:",
-           "en":"✅ Spacing <b>1.5</b> selected!\n\n📌 <b>12/13:</b> How many pages?\n\n💡 <i>7—17 recommended</i>\nEnter number <i>(example: 12)</i>:"}
+    q11 = {"tk":"✅ Setirler aralygy <b>1.5</b> saýlandy!\n\n📌 <b>12/13:</b> Näçe sahypa?\n\n💡 <i>7—15 maslahat</i>\nSan ýazyň <i>(mysal: 12)</i>:",
+           "ru":"✅ Интервал <b>1.5</b> выбран!\n\n📌 <b>12/13:</b> Сколько страниц?\n\n💡 <i>7—15 рекомендуется</i>\nВведите число <i>(пример: 12)</i>:",
+           "en":"✅ Spacing <b>1.5</b> selected!\n\n📌 <b>12/13:</b> How many pages?\n\n💡 <i>7—15 recommended</i>\nEnter number <i>(example: 12)</i>:"}
     await ask(cb, q11.get(lang_11,q11["tk"]))
     await state.set_state(St.s12); await cb.answer()
 
