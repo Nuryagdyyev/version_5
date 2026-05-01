@@ -2534,64 +2534,108 @@ def _fix_json_pptx(raw: str) -> str:
     return json.dumps(objects, ensure_ascii=False)
 
 
-async def call_deepseek_pptx(theme: str, slides: int, pres_lang: str) -> list:
-    lang_str = {"ru":"русском","en":"English","tk":"туркменском"}.get(pres_lang,"русском")
-    if pres_lang == "en":
-        system = ("You are a presentation expert. Reply ONLY with a valid JSON array, no markdown. "
-                  "Write ALL slide texts ONLY in English language.")
-    elif pres_lang == "tr":
-        system = ("Sen bir sunum uzmanısın. SADECE geçerli bir JSON dizisiyle yanıt ver, markdown kullanma. "
-                  "Tüm slayt metinlerini YALNIZCA Türkiye Türkçesiyle yaz.")
-    else:
-        system = ("Ты эксперт по созданию презентаций. Отвечай ТОЛЬКО валидным JSON массивом, без markdown. "
-                  "Пиши ВСЕ тексты слайдов ТОЛЬКО на русском языке.")
+async def _pptx_one_batch(theme: str, slide_nums: list, total_slides: int,
+                           pres_lang: str, system: str, lang_str: str) -> list:
+    """Bir toparda birnäçe slaýd üçin JSON al (max 6 slaýd)"""
+    batch_size = len(slide_nums)
+    is_first   = (1 in slide_nums)
+    is_last    = (total_slides in slide_nums)
     lang_instr = {
         "ru": "ВСЕ тексты пиши на русском языке.",
         "en": "Write ALL texts in English language.",
         "tr": "Tüm metinleri Türkiye Türkçesiyle yaz.",
+        "tk": "Ähli tekstleri türkmen dilinde ýaz.",
     }.get(pres_lang, "ВСЕ тексты пиши на русском языке.")
+
+    slides_desc = ", ".join(str(x) for x in slide_nums)
     prompt = (
-        f"Создай презентацию из {slides} слайдов на {lang_str} языке.\n"
-        f"Тема: «{theme}»\n{lang_instr}\n\n"
-        f"Верни JSON массив из {slides} объектов:\n"
-        f'[{{"title":"Заголовок (4-7 слов)","points":["🔹 Пункт 1 — минимум 20 слов","📊 Пункт 2 — минимум 20 слов с фактами","✅ Пункт 3 — минимум 20 слов","💡 Пункт 4 — минимум 20 слов"],"image_prompt":"English description for AI image, photorealistic, 15 words","has_chart":false,"chart_data":{{}}}}]\n\n'
+        f"Тема презентации: «{theme}»\n"
+        f"Создай ТОЛЬКО слайды №{slides_desc} (из {total_slides} всего).\n"
+        f"{lang_instr}\n\n"
+        f"Верни JSON массив ровно из {batch_size} объектов.\n"
+        f"Формат каждого объекта:\n"
+        f'{{"slide_num":N,"title":"Заголовок (4-7 слов)","points":["🔹 Пункт минимум 25 слов содержательно","📊 Пункт минимум 25 слов с фактами","✅ Пункт минимум 25 слов","💡 Пункт минимум 25 слов"],"image_prompt":"English photorealistic description 15 words","has_chart":false,"chart_data":{{}}}}\n\n'
         f"Правила:\n"
-        f"- Слайд 1: title=тема, points=['Развёрнутый подзаголовок 25-35 слов'], has_chart=false\n"
-        f"- Слайды с has_chart=true: chart_data ОБЯЗАТЕЛЬНО содержит:\n"
-        f"  labels — реальные категории по теме (не A/B/C), минимум 4, на {lang_str} языке\n"
-        f"  values — реальные числа (проценты, суммы, показатели) — минимум 4 значения\n"
-        f"  title — заголовок графика на {lang_str} языке (что измеряется)\n"
-        f"  type — 'bar' (первый график), 'pie' (второй), 'line' (третий и далее)\n"
-        f"  caption — 1-2 предложения на {lang_str} языке: что показывает график и вывод\n"
-        f"  y_label — подпись оси Y на {lang_str} языке (%, млн., кг и т.д.)\n"
-        f"- Слайд {slides} (ПОСЛЕДНИЙ): ОБЯЗАТЕЛЬНО 4 полных вывода минимум 25 слов каждый, has_chart=false\n"
-        f"- Последний слайд ДОЛЖЕН БЫТЬ ПОЛНЫМ — не обрывай на середине\n"
-        f"- Остальные: 3-4 пункта минимум 20 слов, начинаются с эмодзи-иконки\n"
-        f"- Каждый объект JSON должен быть ПОЛНЫМ — не обрывай JSON на середине\n"
-        f"- Только JSON массив, никакого текста вне массива"
+    )
+    if is_first:
+        prompt += f"- Слайд 1: title=тема презентации, points=['Развёрнутый вводный подзаголовок 30-40 слов'], has_chart=false\n"
+    if is_last:
+        prompt += f"- Слайд {total_slides} (ПОСЛЕДНИЙ): title='Заключение/Выводы', 4 вывода минимум 30 слов каждый, has_chart=false\n"
+    prompt += (
+        f"- Слайды с графиком: has_chart=true, chart_data={{labels:[реальные категории на {lang_str} языке],values:[числа],title:'заголовок',type:'bar'/'pie'/'line',caption:'что показывает 1-2 предложения на {lang_str}',y_label:'единица'}}\n"
+        f"- Остальные слайды: 3-4 пункта минимум 25 слов каждый\n"
+        f"- Каждый объект ПОЛНЫЙ, JSON не обрывается\n"
+        f"- Только JSON массив"
     )
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
                "Content-Type": "application/json", "Accept-Encoding": "identity"}
-    # Slaýd sanyna görä token: her slaýd ≈ 150-200 token
-    _pptx_tokens = min(8000, max(3000, slides * 250 + 1000))
     body = {"model": DEEPSEEK_MODEL,
-            "messages": [{"role":"system","content":system},{"role":"user","content":prompt}],
-            "max_tokens": _pptx_tokens, "temperature": 0.7}
+            "messages": [{"role":"system","content":system}, {"role":"user","content":prompt}],
+            "max_tokens": min(8000, batch_size * 600 + 500),
+            "temperature": 0.7}
     async with httpx.AsyncClient(timeout=httpx.Timeout(connect=60,read=300,write=60,pool=30)) as cl:
         r = await cl.post(DEEPSEEK_URL, headers=headers, json=body)
-        if r.status_code != 200: raise RuntimeError(f"DeepSeek {r.status_code}")
+        if r.status_code != 200: raise RuntimeError(f"DeepSeek {r.status_code}: {r.text[:200]}")
         raw = r.json()["choices"][0]["message"]["content"].strip()
     raw = re.sub(r"```json\s*","",raw); raw = re.sub(r"```\s*","",raw); raw = raw.strip()
     s = raw.find("["); e = raw.rfind("]")
-    if s == -1 or e == -1: raise RuntimeError("JSON tapylmady")
-    raw = raw[s:e+1]
-    try: data = json.loads(raw)
-    except json.JSONDecodeError as ex:
-        log.warning(f"JSON bozulan: {ex}"); data = json.loads(_fix_json_pptx(raw))
-    while len(data) < slides:
-        data.append({"title": f"Bölüm {len(data)+1}", "points": ["Mazmun."]*3,
-                     "image_prompt": theme + " professional photo"})
-    return data[:slides]
+    if s == -1 or e == -1:
+        log.warning(f"Batch {slide_nums}: JSON tapylmady, fallback")
+        return []
+    try: data = json.loads(raw[s:e+1])
+    except json.JSONDecodeError:
+        try: data = json.loads(_fix_json_pptx(raw))
+        except: data = []
+    # slide_num meýdanyny aýyr, tertibe görä gaýtar
+    result = []
+    for item in data:
+        if isinstance(item, dict):
+            item.pop("slide_num", None)
+            result.append(item)
+    return result
+
+
+async def call_deepseek_pptx(theme: str, slides: int, pres_lang: str) -> list:
+    lang_str = {"ru":"русском","en":"English","tk":"туркменском","tr":"турецком"}.get(pres_lang,"русском")
+    if pres_lang == "en":
+        system = ("You are a presentation expert. Reply ONLY with a valid JSON array, no markdown, no extra text. "
+                  "Write ALL slide texts ONLY in English.")
+    elif pres_lang == "tr":
+        system = ("Sen sunum uzmanısın. SADECE geçerli JSON dizisi döndür, markdown yok. "
+                  "Tüm metinleri YALNIZCA Türkçe yaz.")
+    elif pres_lang == "tk":
+        system = ("Sen prezentasiýa hünärmeni. Diňe dogry JSON massiwi gaýtar, markdown ýok. "
+                  "Ähli tekstleri diňe türkmen dilinde ýaz.")
+    else:
+        system = ("Ты эксперт по презентациям. Отвечай ТОЛЬКО валидным JSON массивом, без markdown, без лишнего текста. "
+                  "Пиши ВСЕ тексты ТОЛЬКО на русском языке.")
+
+    # Slaýdlary toparlara böl: max 5 slaýd bir toparda
+    BATCH = 5
+    all_nums = list(range(1, slides + 1))
+    batches  = [all_nums[i:i+BATCH] for i in range(0, len(all_nums), BATCH)]
+
+    all_data = []
+    for batch_nums in batches:
+        batch_data = await _pptx_one_batch(theme, batch_nums, slides, pres_lang, system, lang_str)
+        # Eger az geldi - fallback goş
+        while len(batch_data) < len(batch_nums):
+            idx = len(all_data) + len(batch_data) + 1
+            batch_data.append({
+                "title": f"{theme} — {idx}",
+                "points": [
+                    f"🔹 {theme} barada {idx}-nji bölüm.",
+                    f"📊 Bu bölümde esasy maglumatlar beýan edilýär.",
+                    f"✅ Görkezijiler we netijelar seljerilýär.",
+                ],
+                "image_prompt": f"{theme} professional photography high quality",
+                "has_chart": False,
+                "chart_data": {}
+            })
+        all_data.extend(batch_data[:len(batch_nums)])
+        log.info(f"PPTX batch {batch_nums[0]}-{batch_nums[-1]}: {len(batch_data)} slaýd alyndy")
+
+    return all_data[:slides]
 
 
 # ─── PPTX HANDLERS ───────────────────────────────────────────────────
@@ -2708,9 +2752,44 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
         except: pass
 
     try:
-        _s1 = {"tk":"📝 Slaýd mazmuny ýazylýar...","ru":"📝 Создание содержания слайдов...","en":"📝 Writing slide content..."}.get(_ui_lang,"📝")
-        await upd(10,_s1,n,0)
-        slides_data = await call_deepseek_pptx(theme, n, pres_lang)
+        BATCH = 5
+        n_batches = (n + BATCH - 1) // BATCH
+        _s1 = {"tk":f"📝 Slaýd mazmuny ýazylýar (0/{n_batches} blok)...",
+               "ru":f"📝 Создание слайдов (0/{n_batches} блок)...",
+               "en":f"📝 Writing slides (0/{n_batches} block)..."}.get(_ui_lang,"📝")
+        await upd(10, _s1, n, 0)
+
+        # Batch progress - her toparda upd
+        all_nums  = list(range(1, n + 1))
+        batches   = [all_nums[i:i+BATCH] for i in range(0, len(all_nums), BATCH)]
+        slides_data = []
+        import httpx as _httpx2, re as _re3, json as _json3
+        lang_str2 = {"ru":"русском","en":"English","tk":"туркменском","tr":"турецком"}.get(pres_lang,"русском")
+        if pres_lang == "en":
+            system2 = ("You are a presentation expert. Reply ONLY with a valid JSON array, no markdown, no extra text. Write ALL slide texts ONLY in English.")
+        elif pres_lang == "tr":
+            system2 = ("Sen sunum uzmanısın. SADECE geçerli JSON dizisi döndür, markdown yok. Tüm metinleri YALNIZCA Türkçe yaz.")
+        elif pres_lang == "tk":
+            system2 = ("Sen prezentasiýa hünärmeni. Diňe dogry JSON massiwi gaýtar, markdown ýok. Ähli tekstleri diňe türkmen dilinde ýaz.")
+        else:
+            system2 = ("Ты эксперт по презентациям. Отвечай ТОЛЬКО валидным JSON массивом, без markdown, без лишнего текста. Пиши ВСЕ тексты ТОЛЬКО на русском языке.")
+
+        for _bi, batch_nums in enumerate(batches):
+            _bs_lbl = {"tk":f"📝 {_bi+1}/{n_batches} blok ýazylýar...",
+                       "ru":f"📝 Блок {_bi+1}/{n_batches}...",
+                       "en":f"📝 Block {_bi+1}/{n_batches}..."}.get(_ui_lang,"📝")
+            await upd(10 + int(40*_bi/n_batches), _bs_lbl, n, 0)
+            batch_res = await _pptx_one_batch(theme, batch_nums, n, pres_lang, system2, lang_str2)
+            while len(batch_res) < len(batch_nums):
+                idx = len(slides_data) + len(batch_res) + 1
+                batch_res.append({
+                    "title": f"{theme} — {idx}",
+                    "points": ["🔹 Esasy maglumatlar.","📊 Seljerme we görkezijiler.","✅ Netijeler we çözgütler."],
+                    "image_prompt": f"{theme} professional photography",
+                    "has_chart": False, "chart_data": {}
+                })
+            slides_data.extend(batch_res[:len(batch_nums)])
+            log.info(f"Batch {batch_nums[0]}-{batch_nums[-1]}: {len(batch_res)} slaýd")
 
         # Slaýd sanyna görä surat sany
         import random as _rnd
