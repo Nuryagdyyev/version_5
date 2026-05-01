@@ -49,11 +49,11 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 REDIS_URL        = os.getenv("REDIS_URL", None)
 
 ADMIN_IDS        = [8512644114, 7404431806]
-INTRO_VIDEO_URL  = "https://youtu.be/H6vFevTXuCk?si=aD2jKggMEdJSAaZm"
+INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
-PRICE_STARS      = {"referat": 149, "doklad": 149, "pptx": 149}  # Telegram Stars
+PRICE_STARS      = {"referat": 1, "doklad": 1, "pptx": 1}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
@@ -1659,9 +1659,9 @@ async def h02_no(cb: CallbackQuery, state: FSMContext):
     await state.update_data(has_req=False, req_text="")
     d_pre2 = await state.get_data()
     lang_p2 = d_pre2.get("ui_lang","tk")
-    uni_q2 = {"tk":"✅ <b>Adaty GOST görnüşi.</b>\n\n📌 <b>3/13:</b> Uniwersitetiňiziň doly adyny ýazyň\n<i>Mysal: Turkmen Dowlet Energetika Insituty</i>",
-               "ru":"✅ <b>Стандартный ГОСТ.</b>\n\n📌 <b>3/13:</b> Полное название университета\n<i>Пример: Пермский националный исследовательский политехнический университет</i>",
-               "en":"✅ <b>Standard GOST format.</b>\n\n📌 <b>3/13:</b> Full university name\n<i>Example: Uniwersity of Cambridge</i>"}
+    uni_q2 = {"tk":"✅ <b>Adaty GOST görnüşi.</b>\n\n📌 <b>3/13:</b> Uniwersitetiňiziň doly adyny ýazyň\n<i>Mysal: TDEI</i>",
+               "ru":"✅ <b>Стандартный ГОСТ.</b>\n\n📌 <b>3/13:</b> Полное название университета\n<i>Пример: ТГЭИ</i>",
+               "en":"✅ <b>Standard GOST format.</b>\n\n📌 <b>3/13:</b> Full university name\n<i>Example: TSUE</i>"}
     await ask(cb, uni_q2.get(lang_p2, uni_q2["tk"]))
     await state.set_state(St.s03); await cb.answer()
 
@@ -2033,8 +2033,26 @@ def kb_pay(lang="tk"):
         "ru": "⭐ Оплатить Telegram Stars",
         "en": "⭐ Pay with Telegram Stars",
     }
+    premium_labels = {
+        "tk": "👑 Premium Bot",
+        "ru": "👑 Premium Bot",
+        "en": "👑 Premium Bot",
+    }
+    stars_bot_labels = {
+        "tk": "⭐ Stars satyn al",
+        "ru": "⭐ Купить Stars",
+        "en": "⭐ Buy Stars",
+    }
+    channel_labels = {
+        "tk": "📢 IT_turkmen kanalymyz",
+        "ru": "📢 Наш канал IT_turkmen",
+        "en": "📢 Our channel IT_turkmen",
+    }
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=labels.get(lang,labels["tk"]), callback_data="pay:stars")],
+        [InlineKeyboardButton(text=premium_labels.get(lang,"👑 Premium Bot"), url="https://t.me/PremiumBot"),
+         InlineKeyboardButton(text=stars_bot_labels.get(lang,"⭐ Buy Stars"), url="https://t.me/TheDurovStars_bot")],
+        [InlineKeyboardButton(text=channel_labels.get(lang,"📢 IT_turkmen"), url="https://t.me/IT_turkmen")],
     ])
 
 KB_PAY = kb_pay()  # default
@@ -2840,15 +2858,15 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
                 "tk": (f"✅ <b>Prezentasiýaňyz taýar boldy!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} slaýd\n\n"
                        f"⭐ <b>Töleg üçin aşakdaky düwmä basyň:</b>\n"
-                       f"💰 Baha: <b>159 Telegram Stars</b>"),
+                       f"💰 Baha: <b>{PRICE_STARS['pptx']} Telegram Stars</b>"),
                 "ru": (f"✅ <b>Ваша презентация готова!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} слайдов\n\n"
                        f"⭐ <b>Для оплаты нажмите кнопку ниже:</b>\n"
-                       f"💰 Стоимость: <b>159 Telegram Stars</b>"),
+                       f"💰 Стоимость: <b>{PRICE_STARS['pptx']} Telegram Stars</b>"),
                 "en": (f"✅ <b>Your presentation is ready!</b>\n\n"
                        f"📝 <i>{theme}</i>\n📊 {n} slides\n\n"
                        f"⭐ <b>Press the button below to pay:</b>\n"
-                       f"💰 Price: <b>159 Telegram Stars</b>"),
+                       f"💰 Price: <b>{PRICE_STARS['pptx']} Telegram Stars</b>"),
             }
             await bot.edit_message_text(
                 pay_msgs.get(lang_p, pay_msgs["tk"]),
