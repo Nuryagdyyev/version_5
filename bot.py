@@ -2408,25 +2408,41 @@ def build_pptx(slides_data: list, theme: str, images: list, student_info: dict =
             _prect(slide, 0.7, 2.65, 11.0, 0.06, PC["accent"])
             # Nokatlar - 2 sütün görnüşinde
             import re as _re2
+            _n_pts = min(len(points), 4)
+            _rows  = (_n_pts + 1) // 2          # 1-2 → 1 setir, 3-4 → 2 setir
+            _row_h = min(1.9, 4.2 / _rows)      # Her setiriň beýikligi
+            _txt_w = 5.8                         # Tekst gutusynyň ini
+            _fsize = 11                          # Font ölçegi
+
             for pi, pt in enumerate(points[:4]):
-                col = pi % 2; row = pi // 2
-                xl = 0.8 + col * 6.2; yt = 2.85 + row * 2.1
-                # Reňkli belgije
-                sh_num = slide.shapes.add_shape(9,Inches(xl),Inches(yt),Inches(0.45),Inches(0.45))
+                col = pi % 2
+                row = pi // 2
+                xl  = 0.6 + col * 6.5
+                yt  = 2.85 + row * _row_h
+                # Reňkli san belgisi
+                sh_num = slide.shapes.add_shape(9, Inches(xl), Inches(yt), Inches(0.42), Inches(0.42))
                 sh_num.fill.solid(); sh_num.fill.fore_color.rgb = PC["accent"]; sh_num.line.fill.background()
                 tf_n2 = sh_num.text_frame; tf_n2.word_wrap = False
                 pn2 = tf_n2.paragraphs[0]; pn2.alignment = PP_ALIGN.CENTER
                 rn2 = pn2.add_run(); rn2.text = str(pi+1)
-                rn2.font.name = "Times New Roman"; rn2.font.size = PPtx(11)
+                rn2.font.name = "Times New Roman"; rn2.font.size = PPtx(10)
                 rn2.font.bold = True; rn2.font.color.rgb = PC["white"]
-                # Tekst
-                pt_clean = _re2.sub(r"^[🔹📊✅💡📌🎯🔑📈🔷▸•]+\s*","",pt)
-                tx_pt = _ptx(slide, xl+0.55, yt-0.05, 5.4, 1.9)
+                # Tekst - çäklendirilen, söze görä kesil
+                pt_clean = _re2.sub(r"^[🔹📊✅💡📌🎯🔑📈🔷▸•⚡🌟🔶💎🏆📝🔷]+\s*","",pt)
+                # Tekst gutujygy - beýiklik _row_h-dan biraz az
+                _th = _row_h - 0.15
+                tx_pt = _ptx(slide, xl+0.5, yt, _txt_w, _th)
                 tf_pt = tx_pt.text_frame; tf_pt.word_wrap = True
+                # Auto-fit ýok, word_wrap bilen çäkle
+                from pptx.util import Emu as _Emu
+                tf_pt.auto_size = None
                 rpt = tf_pt.paragraphs[0].add_run()
-                rpt.text = pt_clean[:120]
-                rpt.font.name = "Times New Roman"; rpt.font.size = PPtx(12)
+                # Söz sanyna görä kes (takmynan 15 söz = 90 harp)
+                _max_chars = int(_txt_w * _th * 18)  # ölçege görä takmynan
+                rpt.text = pt_clean[:min(len(pt_clean), _max_chars)]
+                rpt.font.name = "Times New Roman"; rpt.font.size = PPtx(_fsize)
                 rpt.font.color.rgb = PC["light_t"]
+                tf_pt.paragraphs[0].alignment = PP_ALIGN.LEFT
             # Slaýd san
             tx_n = _ptx(slide, 12.2, 6.9, 0.9, 0.45)
             rn = tx_n.text_frame.paragraphs[0].add_run(); rn.text = f"{total} / {total}"
@@ -2478,18 +2494,36 @@ def build_pptx(slides_data: list, theme: str, images: list, student_info: dict =
             else:
                 tl,tt,tw,th = 0.3,1.35,12.7,5.9
 
-            tx_b = _ptx(slide, tl+0.38, tt+0.08, tw-0.4, th-0.1)
+            # Tekst sygýan mukdary hasapla
+            _avail_h = th - 0.2        # elýeterli beýiklik inç
+            _max_pts = min(len(points), 4)
+            # Font ölçegi beýiklige görä
+            if _avail_h >= 4.5:
+                _fsize_m = 13; _line_sp_m = 1.25
+            elif _avail_h >= 3.0:
+                _fsize_m = 12; _line_sp_m = 1.1
+            else:
+                _fsize_m = 11; _line_sp_m = 1.0
+            # Bir nokat üçin beýiklik (inç)
+            _pt_h    = _avail_h / _max_pts
+            step     = _pt_h
+
+            tx_b = _ptx(slide, tl+0.38, tt+0.08, tw-0.4, _avail_h)
             tf_b = tx_b.text_frame; tf_b.word_wrap = True
-            step = min((th-0.2)/max(len(points),1), 1.5)
-            for pi, pt in enumerate(points):
-                dy = tt+0.18+pi*step
-                if dy+0.22 < tt+th:
+
+            for pi, pt in enumerate(points[:_max_pts]):
+                dy = tt + 0.18 + pi * step
+                if dy + 0.2 < tt + th:
                     _pdot(slide, tl+0.05, dy, PC["accent"])
                 pp = tf_b.paragraphs[0] if pi == 0 else tf_b.add_paragraph()
-                rr = pp.add_run(); rr.text = pt
-                rr.font.name = "Times New Roman"; rr.font.size = PPtx(14)
+                rr = pp.add_run()
+                # Her nokat üçin tekst çäkle - 1 setirlere sygdyr
+                _chars_per_line = int((tw - 0.6) * 14)  # takmynan
+                _max_chars_pt   = _chars_per_line * int(_pt_h / (_fsize_m / 72.0) * _line_sp_m + 0.5)
+                rr.text = pt[:min(len(pt), max(80, _max_chars_pt))]
+                rr.font.name = "Times New Roman"; rr.font.size = PPtx(_fsize_m)
                 rr.font.color.rgb = PC["dark_t"]
-                pp.space_before = PPtx(int(step*72*0.55))
+                pp.space_before = PPtx(int(step * 72 * 0.35))
                 pp.alignment = PP_ALIGN.LEFT
 
     buf = io.BytesIO(); prs.save(buf); buf.seek(0)
