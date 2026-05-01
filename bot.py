@@ -53,7 +53,7 @@ INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
-PRICE_STARS      = {"referat": 149, "doklad": 149, "pptx": 149}  # Telegram Stars
+PRICE_STARS      = {"referat": 1, "doklad": 1, "pptx": 1}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
@@ -770,19 +770,18 @@ def build_prompt(d: dict) -> str:
     pages = int(d["pages"])
     secs  = int(d["sections"])
     spc   = spc_str(d.get("spacing", "default"))
-    # 1 sahypa ≈ 1800 simwol (Times New Roman 14pt, 1.5 interval, A4)
-    # ýöne DeepSeek 8000 token ≈ 24000 simwol → max 13 sahypa doly ýazyp bilýär
-    # Sahypa sanyna görä cpp dinamiki
-    if pages <= 10:
-        cpp = 1600
-    elif pages <= 14:
-        cpp = 1300
-    else:
-        cpp = 1100
+    # Word-da 1 sahypa (A4, TNR 14pt, 1.5 interval) ≈ 1500 simwol
+    # DeepSeek 8000 token ≈ 20000-22000 simwol (rus dili üçin)
+    # Takyk sahypa sany üçin: her bölümiň simwol sanyny kesgitle
+    cpp   = 1500
     total = pages * cpp
-    ic    = int(total * 0.15)
-    cc    = int(total * 0.65 / secs)
-    nc    = int(total * 0.10)
+    # Giriş we netije has gysga, esasy bölümler köp
+    ic    = int(total * 0.12)          # Giriş: 12%
+    cc    = int(total * 0.68 / secs)   # Her bölüm: 68% / bölüm sany
+    nc    = int(total * 0.10)          # Netije: 10%
+    # max_tokens bilen sazla - 1 token ≈ 2.5 simwol (rus)
+    _needed_tokens = int(total / 2.5) + 500  # goşmaça 500 token
+    _max_tok = min(8000, max(3000, _needed_tokens))
     chs   = ""
     for i in range(1, secs + 1):
         chs += (f"\n##ГЛАВА_{i}##\n"
@@ -820,6 +819,10 @@ def build_prompt(d: dict) -> str:
     )
     _struct = _struct_en if doc_lang == "en" else _struct_ru
 
+    # max_tokens sahypa sanyna görä
+    _needed = int(total / 2.5) + 500
+    d["_max_tokens_calc"] = min(8000, max(3000, _needed))
+
     return (
         f"{extra_block}"
         f"Ты академический автор. {_lang_note}\n\n"
@@ -829,8 +832,12 @@ def build_prompt(d: dict) -> str:
         f"Студент: {d['fullname']}, {d['course']} курс, гр. {d['group']}\n"
         f"Преподаватель: {tline}\n"
         f"Глав: {secs} | Страниц: {pages} | Источников: {d['sources']} | Интервал: {spc}\n\n"
-        f"ОБЪЁМ: РОВНО {pages} стр. A4 = ~{total} символов.\n"
-        f"• Введение/Introduction: ~{ic} символов\n• Каждая глава/Chapter: ~{cc} символов\n• Заключение/Conclusion: ~{nc} символов\n\n"
+        f"СТРОГИЙ ОБЪЁМ: РОВНО {pages} страниц A4.\n"
+        f"1 страница A4 (TNR 14пт, интервал 1.5) = 1500 символов.\n"
+        f"ИТОГО: ~{total} символов. НЕ БОЛЬШЕ и НЕ МЕНЬШЕ.\n"
+        f"• Введение: строго ~{ic} символов ({round(ic/1500,1)} стр.)\n"
+        f"• Каждая глава: строго ~{cc} символов ({round(cc/1500,1)} стр.)\n"
+        f"• Заключение: строго ~{nc} символов ({round(nc/1500,1)} стр.)\n\n"
         f"СТРУКТУРА — строго эти маркеры:\n\n"
         f"{_struct}"
         f"Формат: «N. Автор. Название. — Город : Издательство, Год. — Стр. с.»\n"
@@ -919,13 +926,14 @@ async def call_deepseek(d: dict, on_progress) -> str:
             "Все перечисления нумеруй: 1. 2. 3. — никаких маркеров •/—. "
             "Без вступлений и пояснений."
         )
+    _max_tok = d.get("_max_tokens_calc", 8000)
     body = {
         "model":       DEEPSEEK_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_content_final},
         ],
-        "max_tokens":  8000,
+        "max_tokens":  _max_tok,
         "temperature": 0.7,
         "stream":      False,
     }
@@ -1669,9 +1677,9 @@ async def h02_no(cb: CallbackQuery, state: FSMContext):
     await state.update_data(has_req=False, req_text="")
     d_pre2 = await state.get_data()
     lang_p2 = d_pre2.get("ui_lang","tk")
-    uni_q2 = {"tk":"✅ <b>Adaty GOST görnüşi.</b>\n\n📌 <b>3/13:</b> Uniwersitetiňiziň doly adyny ýazyň\n<i>Mysal: Пермский национальный исследовательский политехнический университет/i>",
-               "ru":"✅ <b>Стандартный ГОСТ.</b>\n\n📌 <b>3/13:</b> Полное название университета\n<i>Пример: Пермский национальный исследовательский политехнический университет</i>",
-               "en":"✅ <b>Standard GOST format.</b>\n\n📌 <b>3/13:</b> Full university name\n<i>Example: Пермский национальный исследовательский политехнический университет</i>"}
+    uni_q2 = {"tk":"✅ <b>Adaty GOST görnüşi.</b>\n\n📌 <b>3/13:</b> Uniwersitetiňiziň doly adyny ýazyň\n<i>Mysal: TDEI</i>",
+               "ru":"✅ <b>Стандартный ГОСТ.</b>\n\n📌 <b>3/13:</b> Полное название университета\n<i>Пример: ТГЭИ</i>",
+               "en":"✅ <b>Standard GOST format.</b>\n\n📌 <b>3/13:</b> Full university name\n<i>Example: TSUE</i>"}
     await ask(cb, uni_q2.get(lang_p2, uni_q2["tk"]))
     await state.set_state(St.s03); await cb.answer()
 
@@ -1795,9 +1803,9 @@ async def h10(cb: CallbackQuery, state: FSMContext):
 async def h11_def(cb: CallbackQuery, state: FSMContext):
     await state.update_data(spacing="default")
     d_11 = await state.get_data(); lang_11 = d_11.get("ui_lang","tk")
-    q11 = {"tk":"✅ Setirler aralygy <b>1.5</b> saýlandy!\n\n📌 <b>12/13:</b> Näçe sahypa?\n\n💡 <i>7—15 maslahat</i>\nSan ýazyň <i>(mysal: 12)</i>:",
-           "ru":"✅ Интервал <b>1.5</b> выбран!\n\n📌 <b>12/13:</b> Сколько страниц?\n\n💡 <i>7—15 рекомендуется</i>\nВведите число <i>(пример: 12)</i>:",
-           "en":"✅ Spacing <b>1.5</b> selected!\n\n📌 <b>12/13:</b> How many pages?\n\n💡 <i>7—15 recommended</i>\nEnter number <i>(example: 12)</i>:"}
+    q11 = {"tk":"✅ Setirler aralygy <b>1.5</b> saýlandy!\n\n📌 <b>12/13:</b> Näçe sahypa?\n\n💡 <i>7—17 maslahat</i>\nSan ýazyň <i>(mysal: 12)</i>:",
+           "ru":"✅ Интервал <b>1.5</b> выбран!\n\n📌 <b>12/13:</b> Сколько страниц?\n\n💡 <i>7—17 рекомендуется</i>\nВведите число <i>(пример: 12)</i>:",
+           "en":"✅ Spacing <b>1.5</b> selected!\n\n📌 <b>12/13:</b> How many pages?\n\n💡 <i>7—17 recommended</i>\nEnter number <i>(example: 12)</i>:"}
     await ask(cb, q11.get(lang_11,q11["tk"]))
     await state.set_state(St.s12); await cb.answer()
 
@@ -2556,15 +2564,19 @@ async def call_deepseek_pptx(theme: str, slides: int, pres_lang: str) -> list:
         f"  type — 'bar' (первый график), 'pie' (второй), 'line' (третий и далее)\n"
         f"  caption — 1-2 предложения на {lang_str} языке: что показывает график и вывод\n"
         f"  y_label — подпись оси Y на {lang_str} языке (%, млн., кг и т.д.)\n"
-        f"- Слайд {slides}: 4 вывода по 20+ слов, has_chart=false\n"
+        f"- Слайд {slides} (ПОСЛЕДНИЙ): ОБЯЗАТЕЛЬНО 4 полных вывода минимум 25 слов каждый, has_chart=false\n"
+        f"- Последний слайд ДОЛЖЕН БЫТЬ ПОЛНЫМ — не обрывай на середине\n"
         f"- Остальные: 3-4 пункта минимум 20 слов, начинаются с эмодзи-иконки\n"
-        f"- Только JSON, никакого текста вне массива"
+        f"- Каждый объект JSON должен быть ПОЛНЫМ — не обрывай JSON на середине\n"
+        f"- Только JSON массив, никакого текста вне массива"
     )
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}",
                "Content-Type": "application/json", "Accept-Encoding": "identity"}
+    # Slaýd sanyna görä token: her slaýd ≈ 150-200 token
+    _pptx_tokens = min(8000, max(3000, slides * 250 + 1000))
     body = {"model": DEEPSEEK_MODEL,
             "messages": [{"role":"system","content":system},{"role":"user","content":prompt}],
-            "max_tokens": 6000, "temperature": 0.7}
+            "max_tokens": _pptx_tokens, "temperature": 0.7}
     async with httpx.AsyncClient(timeout=httpx.Timeout(connect=60,read=300,write=60,pool=30)) as cl:
         r = await cl.post(DEEPSEEK_URL, headers=headers, json=body)
         if r.status_code != 200: raise RuntimeError(f"DeepSeek {r.status_code}")
