@@ -770,7 +770,15 @@ def build_prompt(d: dict) -> str:
     pages = int(d["pages"])
     secs  = int(d["sections"])
     spc   = spc_str(d.get("spacing", "default"))
-    cpp   = 1500
+    # 1 sahypa ≈ 1800 simwol (Times New Roman 14pt, 1.5 interval, A4)
+    # ýöne DeepSeek 8000 token ≈ 24000 simwol → max 13 sahypa doly ýazyp bilýär
+    # Sahypa sanyna görä cpp dinamiki
+    if pages <= 10:
+        cpp = 1600
+    elif pages <= 14:
+        cpp = 1300
+    else:
+        cpp = 1100
     total = pages * cpp
     ic    = int(total * 0.15)
     cc    = int(total * 0.65 / secs)
@@ -831,6 +839,8 @@ def build_prompt(d: dict) -> str:
         f"• только русский язык\n"
         f"• НЕТ подразделов 1.1/1.2\n"
         f"• Все перечисления нумеруй: 1. 2. 3. (не используй маркеры •/—)\n"
+        f"• ОБЯЗАТЕЛЬНО напиши ВСЕ разделы до конца — включая ЗАКЛЮЧЕНИЕ и СПИСОК_ЛИТЕРАТУРЫ\n"
+        f"• Не обрывай текст на середине\n"
         f"• Начинай с ##ВВЕДЕНИЕ##:"
     )
 
@@ -915,7 +925,7 @@ async def call_deepseek(d: dict, on_progress) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_content_final},
         ],
-        "max_tokens":  6000,
+        "max_tokens":  8000,
         "temperature": 0.7,
         "stream":      False,
     }
@@ -1816,8 +1826,8 @@ async def h12(msg: Message, state: FSMContext):
     try: n = int(msg.text.strip())
     except:
         await msg.answer({"tk":"❌ Diňe san ýazyň! Mysal: 12","ru":"❌ Введите число! Пример: 12","en":"❌ Enter a number! Example: 12"}.get(lang,"❌"), parse_mode="HTML"); return
-    if not (7 <= n <= 17):
-        await msg.answer({"tk":"⚠️ Diňe 7—17 arasynda!","ru":"⚠️ Только от 7 до 17!","en":"⚠️ Only 7—17!"}.get(lang,"⚠️"), parse_mode="HTML"); return
+    if not (7 <= n <= 15):
+        await msg.answer({"tk":"⚠️ Diňe 7—15 arasynda!","ru":"⚠️ Только от 7 до 15!","en":"⚠️ Only 7—15!"}.get(lang,"⚠️"), parse_mode="HTML"); return
     await state.update_data(pages=n)
     q = {"tk":f"✅ {n} sahypa!\n\n📌 <b>13/13:</b> Çeşme sany? (8-20)",
          "ru":f"✅ {n} страниц!\n\n📌 <b>13/13:</b> Количество источников? (8-20)",
