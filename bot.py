@@ -2427,19 +2427,13 @@ def build_pptx(slides_data: list, theme: str, images: list, student_info: dict =
                 rn2 = pn2.add_run(); rn2.text = str(pi+1)
                 rn2.font.name = "Times New Roman"; rn2.font.size = PPtx(10)
                 rn2.font.bold = True; rn2.font.color.rgb = PC["white"]
-                # Tekst - çäklendirilen, söze görä kesil
+                # Tekst doly, kesilmeýär
                 pt_clean = _re2.sub(r"^[🔹📊✅💡📌🎯🔑📈🔷▸•⚡🌟🔶💎🏆📝🔷]+\s*","",pt)
-                # Tekst gutujygy - beýiklik _row_h-dan biraz az
-                _th = _row_h - 0.15
+                _th = _row_h - 0.12
                 tx_pt = _ptx(slide, xl+0.5, yt, _txt_w, _th)
                 tf_pt = tx_pt.text_frame; tf_pt.word_wrap = True
-                # Auto-fit ýok, word_wrap bilen çäkle
-                from pptx.util import Emu as _Emu
-                tf_pt.auto_size = None
                 rpt = tf_pt.paragraphs[0].add_run()
-                # Söz sanyna görä kes (takmynan 15 söz = 90 harp)
-                _max_chars = int(_txt_w * _th * 18)  # ölçege görä takmynan
-                rpt.text = pt_clean[:min(len(pt_clean), _max_chars)]
+                rpt.text = pt_clean           # DOLY tekst, kesilmeýär
                 rpt.font.name = "Times New Roman"; rpt.font.size = PPtx(_fsize)
                 rpt.font.color.rgb = PC["light_t"]
                 tf_pt.paragraphs[0].alignment = PP_ALIGN.LEFT
