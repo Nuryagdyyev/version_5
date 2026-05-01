@@ -2828,9 +2828,9 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
         # 10 slaýd → 4 surat + 4 grafik + 2 fon
         # 12 slaýd → 5 surat + 5 grafik + 2 fon
         _PLAN = {
-            7:  {"img": 2, "chart": 3},
-            10: {"img": 4, "chart": 4},
-            12: {"img": 5, "chart": 5},
+            7:  {"img": 4, "chart": 1},
+            10: {"img": 6, "chart": 2},
+            12: {"img": 8, "chart": 2},
         }
         # Iň ýakyn plany tap
         _plan_key = min(_PLAN.keys(), key=lambda k: abs(k - n))
