@@ -2909,12 +2909,20 @@ async def hp3_slides(cb: CallbackQuery, state: FSMContext, bot: Bot):
                 "tr":["2020","2021","2022","2023"],
                 "tk":["2020","2021","2022","2023"],
             }.get(pres_lang,["2020","2021","2022","2023"])
-            _bar_labels = {
-                "ru":["I кв.","II кв.","III кв.","IV кв."],
-                "en":["Q1","Q2","Q3","Q4"],
-                "tr":["Ç1","Ç2","Ç3","Ç4"],
-                "tk":["I ç.","II ç.","III ç.","IV ç."],
-            }.get(pres_lang,["I","II","III","IV"])
+            # Fallback labels - tema boýunça anyk sözler (tema sözlerinden al)
+            _theme_words = [w for w in _sld_title.split() if len(w) > 3][:4]
+            if len(_theme_words) >= 2:
+                _bar_lbs = _theme_words[:4]
+                while len(_bar_lbs) < 4:
+                    _bar_lbs.append(f"{_bar_lbs[-1]}+")
+            else:
+                _bar_lbs = {
+                    "ru":["2020 г.","2021 г.","2022 г.","2023 г."],
+                    "en":["2020","2021","2022","2023"],
+                    "tr":["2020","2021","2022","2023"],
+                    "tk":["2020","2021","2022","2023"],
+                }.get(pres_lang,["2020","2021","2022","2023"])
+            _bar_labels = _bar_lbs
 
             if not slides_data[_ci].get("chart_data") or not slides_data[_ci]["chart_data"].get("labels"):
                 _vals = [_rnd.randint(35,95) for _ in range(4)]
