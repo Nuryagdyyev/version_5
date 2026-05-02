@@ -49,7 +49,7 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 REDIS_URL        = os.getenv("REDIS_URL", None)
 
 ADMIN_IDS        = [8512644114, 7404431806]
-INTRO_VIDEO_URL  = "https://youtu.be/FX7MlvKpGqA?si=gsmJpuFiQ_gHKFN8"
+INTRO_VIDEO_URL  = "https://youtu.be/Lm3D5o-4gcM?si=rjMoWCbWourFm8C9"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
