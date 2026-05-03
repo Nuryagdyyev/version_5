@@ -53,7 +53,7 @@ INTRO_VIDEO_URL  = "https://youtu.be/Lm3D5o-4gcM?si=rjMoWCbWourFm8C9"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
-PRICE_STARS      = {"referat": 149, "doklad": 149, "pptx": 149}  # Telegram Stars
+PRICE_STARS      = {"referat": 1, "doklad": 1, "pptx": 1}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
@@ -1455,9 +1455,9 @@ async def deliver(uid: int, bot: Bot):
     lang  = d.get("ui_lang","tk")
     title_m = {"tk":svc_nm,"ru":SVC_RU.get(svc,svc_nm),"en":svc_nm}
     pay_hint = {
-        "tk": f"💳 <b>{svc_nm} taýar!</b>\n\n📝 {d.get('theme','')[:60]}\n\nTölemek üçin aşakdaky düwmä basyň:",
-        "ru": f"💳 <b>{svc_nm} готов!</b>\n\n📝 {d.get('theme','')[:60]}\n\nДля оплаты нажмите кнопку ниже:",
-        "en": f"💳 <b>{svc_nm} ready!</b>\n\n📝 {d.get('theme','')[:60]}\n\nPress the button below to pay:",
+        "tk": f"💳 <b>{svc_nm} taýar! Eger faylda содержание gorunmeyan bolsa kompyuterde achsan chykar</b>\n\n📝 {d.get('theme','')[:60]}\n\nTölemek üçin aşakdaky düwmä basyň:",
+        "ru": f"💳 <b>{svc_nm} готов! Если содержимое файла не отображается, оно появится при открытии файла на вашем компьютере.</b>\n\n📝 {d.get('theme','')[:60]}\n\nДля оплаты нажмите кнопку ниже:",
+        "en": f"💳 <b>{svc_nm} ready! If the file contents are not visible, they will appear when you open them on your computer.</b>\n\n📝 {d.get('theme','')[:60]}\n\nPress the button below to pay:",
     }
     try:
         await bot.send_message(uid, pay_hint.get(lang, pay_hint["tk"]),
