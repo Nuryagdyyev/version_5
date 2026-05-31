@@ -1018,6 +1018,7 @@ async def call_deepseek(d: dict, on_progress) -> str:
 
 
 def parse_ai(raw: str, secs: int) -> dict:
+
     def _between(text, start, *ends):
         s = text.find(start)
         if s == -1: return ""
@@ -1027,33 +1028,53 @@ def parse_ai(raw: str, secs: int) -> dict:
             if p != -1 and p < best: best = p
         return text[s:best].strip()
 
-    intro_raw = _between(raw, "##ВВЕДЕНИЕ##", "##ГЛАВА_1##", "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
-    chapters: list = []
+    # Alternatiw markerleri standartlaşdyr
     for i in range(1, secs + 1):
-        nxt    = f"##ГЛАВА_{i+1}##" if i < secs else "##ЗАКЛЮЧЕНИЕ##"
+        raw = re.sub(rf"(?im)^[\*#]{{0,3}}\s*(?:глава\s+)?{i}[.)]\s+(.+?)\s*$",
+                     rf"##ГЛАВА_{i}##\n{i}. \1", raw)
+    raw = re.sub(r"(?im)^[\*#]{{0,3}}\s*(введение)\s*[\*#:]{{0,3}}\s*$", "##ВВЕДЕНИЕ##", raw)
+    raw = re.sub(r"(?im)^[\*#]{{0,3}}\s*(заключение)\s*[\*#:]{{0,3}}\s*$", "##ЗАКЛЮЧЕНИЕ##", raw)
+    raw = re.sub(r"(?im)^[\*#]{{0,3}}\s*(список\s+литературы|references)\s*[\*#:]{{0,3}}\s*$", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
+
+    # Marker ýok → teksti deň bölümlere aýyr
+    if "##ВВЕДЕНИЕ##" not in raw and "##ГЛАВА_1##" not in raw:
+        log.warning("parse_ai: marker ýok, awtobölünme")
+        lines = [l.strip() for l in raw.splitlines() if l.strip()]
+        n = len(lines); i0 = max(1, n*12//100); c0 = max(i0+1, n*87//100)
+        bl = lines[i0:c0]; sl = max(1, len(bl)//max(secs,1))
+        return dict(
+            intro      = lines[:i0],
+            chapters   = [{"title": f"{i+1}. Раздел {i+1}",
+                           "lines": bl[i*sl:(i+1)*sl if i<secs-1 else len(bl)]}
+                          for i in range(secs) if bl[i*sl:(i+1)*sl]],
+            conclusion = lines[c0:],
+            sources    = []
+        )
+
+    # Standart parse
+    intro_raw = _between(raw, "##ВВЕДЕНИЕ##", "##ГЛАВА_1##", "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
+    chapters = []
+    for i in range(1, secs + 1):
+        nxt = f"##ГЛАВА_{i+1}##" if i < secs else "##ЗАКЛЮЧЕНИЕ##"
         ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##СПИСОК_ЛИТЕРАТУРЫ##")
         if not ch_raw: continue
-        lines = [ln.strip() for ln in ch_raw.splitlines() if ln.strip()]
-        if lines and re.match(r"^\d+\.", lines[0]):
-            title = md_clean(lines[0]); body = lines[1:]
-        else:
-            title = f"{i}. Глава {i}"; body = lines
+        lines = [l.strip() for l in ch_raw.splitlines() if l.strip()]
+        title = md_clean(lines[0]) if lines and re.match(r"^\d+\.", lines[0]) else f"{i}. Глава {i}"
+        body  = lines[1:] if lines and re.match(r"^\d+\.", lines[0]) else lines
         chapters.append({"title": title, "lines": body})
     conc_raw = _between(raw, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
     src_raw  = _between(raw, "##СПИСОК_ЛИТЕРАТУРЫ##")
-    raw_srcs = [ln.strip() for ln in src_raw.splitlines() if ln.strip() and not ln.strip().startswith("##")]
-    sources: list = []
-    for ln in raw_srcs:
+    sources = []
+    for ln in [l.strip() for l in src_raw.splitlines() if l.strip() and not l.strip().startswith("##")]:
         ln = re.sub(r"^(\d+)\.\d+\.", r"\1.", ln)
         if re.match(r"^\d+\.", ln): sources.append(ln)
         elif sources: sources[-1] += " " + ln
     return dict(
-        intro      = [ln.strip() for ln in intro_raw.splitlines() if ln.strip()],
+        intro      = [l.strip() for l in intro_raw.splitlines() if l.strip()],
         chapters   = chapters,
-        conclusion = [ln.strip() for ln in conc_raw.splitlines() if ln.strip()],
+        conclusion = [l.strip() for l in conc_raw.splitlines() if l.strip()],
         sources    = sources,
     )
-
 
 def _sf(run, size_pt=14, bold=False, italic=False):
     run.font.name = "Times New Roman"; run.font.size = Pt(size_pt)
