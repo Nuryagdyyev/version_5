@@ -1075,10 +1075,13 @@ def parse_ai(raw: str, secs: int) -> dict:
         ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
         if not ch_raw: continue
         lines  = [l.strip() for l in ch_raw.splitlines() if l.strip()]
-        if lines and re.match(r"^\d+\.", lines[0]):
-            title, body = md_clean(lines[0]), lines[1:]
-        else:
-            title, body = f"{i}. Глава {i}", lines
+        title = f"{i}. Глава {i}"
+        body  = lines
+        for li, ln in enumerate(lines[:3]):
+            if re.match(rf"^{i}\.", ln):
+                title = md_clean(ln)
+                body  = lines[li+1:]
+                break
         chapters.append({"title": title, "lines": body})
 
     conc_raw = _between(raw, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
