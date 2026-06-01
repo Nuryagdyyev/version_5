@@ -52,7 +52,7 @@ ADMIN_IDS        = [8512644114, 7404431806]
 INTRO_VIDEO_URL  = "https://youtu.be/Lm3D5o-4gcM?si=rjMoWCbWourFm8C9"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
-PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
+PRICE            = {"referat": 5, "doklad": 5, "pptx": 5}  # rubl
 PRICE_STARS      = {"referat": 1, "doklad": 1, "pptx": 1}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
