@@ -921,10 +921,17 @@ async def call_deepseek(d: dict, on_progress) -> str:
         system_prompt = (
             "Ты профессиональный академический автор. "
             "Пиши ТОЛЬКО на русском языке. "
-            "Если в начале задания есть раздел «СТУДЕНТИҢ ÝÖRITE ТАЛАРЫ» — "
-            "это особые требования студента, их ОБЯЗАТЕЛЬНО нужно выполнить полностью. "
-            "Все перечисления нумеруй: 1. 2. 3. — никаких маркеров •/—. "
-            "Без вступлений и пояснений."
+            "СТРОГО ОБЯЗАТЕЛЬНО: каждый раздел начинай ТОЧНО с этих маркеров на отдельной строке:\n"
+            "##ВВЕДЕНИЕ##\n"
+            "##ГЛАВА_1##\n"
+            "##ГЛАВА_2##\n"  
+            "##ГЛАВА_3##\n"
+            "##ЗАКЛЮЧЕНИЕ##\n"
+            "##СПИСОК_ЛИТЕРАТУРЫ##\n"
+            "Маркеры писать ТОЧНО так, без изменений. "
+            "СПИСОК ЛИТЕРАТУРЫ: только 1. 2. 3. — без ##ГЛАВА## внутри. "
+            "Все перечисления: 1. 2. 3. — без маркеров •/—."
+        )
         )
     _max_tok = d.get("_max_tokens_calc", 8000)
     body = {
@@ -2636,7 +2643,7 @@ async def _pptx_one_batch(theme: str, slide_nums: list, total_slides: int,
     body = {"model": DEEPSEEK_MODEL,
             "messages": [{"role":"system","content":system}, {"role":"user","content":prompt}],
             "max_tokens": min(8000, batch_size * 600 + 500),
-            "temperature": 0.7}
+            "temperature": 0.1}
     async with httpx.AsyncClient(timeout=httpx.Timeout(connect=60,read=300,write=60,pool=30)) as cl:
         r = await cl.post(DEEPSEEK_URL, headers=headers, json=body)
         if r.status_code != 200: raise RuntimeError(f"DeepSeek {r.status_code}: {r.text[:200]}")
