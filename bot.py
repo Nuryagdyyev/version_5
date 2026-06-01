@@ -1028,25 +1028,31 @@ def parse_ai(raw: str, secs: int) -> dict:
             if p != -1 and p < best: best = p
         return text[s:best].strip()
 
+    # Her ## öňünde täze setir goş (birleşen markerler üçin)
+    raw = re.sub(r"(?m)(?<!^)(##)", r"\n\1", raw)
+
     # Alternatiw markerleri standartlaşdyr
     for i in range(1, secs + 1):
-        raw = re.sub(rf"(?im)^[\*#]{{0,3}}\s*(?:глава\s+)?{i}[.)]\s+(.+?)\s*$",
-                     rf"##ГЛАВА_{i}##\n{i}. \1", raw)
-    raw = re.sub(r"(?im)^[\*#]{{0,3}}\s*(введение)\s*[\*#:]{{0,3}}\s*$", "##ВВЕДЕНИЕ##", raw)
-    raw = re.sub(r"(?im)^[\*#]{{0,3}}\s*(заключение)\s*[\*#:]{{0,3}}\s*$", "##ЗАКЛЮЧЕНИЕ##", raw)
-    raw = re.sub(r"(?im)^[\*#]{{0,3}}\s*(список\s+литературы|references)\s*[\*#:]{{0,3}}\s*$", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
+        raw = re.sub(
+            rf"(?im)^[*#]{{0,3}}\s*(?:глава\s+)?{i}[.)]\s+(.+?)\s*$",
+            rf"##ГЛАВА_{i}##\n{i}. \1",
+            raw
+        )
+    raw = re.sub(r"(?im)^[*#]{0,3}\s*введение\s*[*#:]{0,3}\s*$",       "##ВВЕДЕНИЕ##",         raw)
+    raw = re.sub(r"(?im)^[*#]{0,3}\s*заключение\s*[*#:]{0,3}\s*$",      "##ЗАКЛЮЧЕНИЕ##",       raw)
+    raw = re.sub(r"(?im)^[*#]{0,3}\s*(список\s+литературы|references)\s*[*#:]{0,3}\s*$", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
 
-    # Marker ýok → teksti deň bölümlere aýyr
+    # Marker ýok → awtobölünme
     if "##ВВЕДЕНИЕ##" not in raw and "##ГЛАВА_1##" not in raw:
         log.warning("parse_ai: marker ýok, awtobölünme")
         lines = [l.strip() for l in raw.splitlines() if l.strip()]
         n = len(lines); i0 = max(1, n*12//100); c0 = max(i0+1, n*87//100)
-        bl = lines[i0:c0]; sl = max(1, len(bl)//max(secs,1))
+        bl = lines[i0:c0]; sl = max(1, len(bl)//max(secs, 1))
         return dict(
             intro      = lines[:i0],
             chapters   = [{"title": f"{i+1}. Раздел {i+1}",
-                           "lines": bl[i*sl:(i+1)*sl if i<secs-1 else len(bl)]}
-                          for i in range(secs) if bl[i*sl:(i+1)*sl]],
+                           "lines": bl[i*sl:(i+1)*sl if i < secs-1 else len(bl)]}
+                          for i in range(secs) if bl[i*sl:i*sl+1]],
             conclusion = lines[c0:],
             sources    = []
         )
@@ -1055,20 +1061,24 @@ def parse_ai(raw: str, secs: int) -> dict:
     intro_raw = _between(raw, "##ВВЕДЕНИЕ##", "##ГЛАВА_1##", "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
     chapters = []
     for i in range(1, secs + 1):
-        nxt = f"##ГЛАВА_{i+1}##" if i < secs else "##ЗАКЛЮЧЕНИЕ##"
+        nxt    = f"##ГЛАВА_{i+1}##" if i < secs else "##ЗАКЛЮЧЕНИЕ##"
         ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##СПИСОК_ЛИТЕРАТУРЫ##")
         if not ch_raw: continue
-        lines = [l.strip() for l in ch_raw.splitlines() if l.strip()]
-        title = md_clean(lines[0]) if lines and re.match(r"^\d+\.", lines[0]) else f"{i}. Глава {i}"
-        body  = lines[1:] if lines and re.match(r"^\d+\.", lines[0]) else lines
+        lines  = [l.strip() for l in ch_raw.splitlines() if l.strip()]
+        if lines and re.match(r"^\d+\.", lines[0]):
+            title, body = md_clean(lines[0]), lines[1:]
+        else:
+            title, body = f"{i}. Глава {i}", lines
         chapters.append({"title": title, "lines": body})
+
     conc_raw = _between(raw, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
     src_raw  = _between(raw, "##СПИСОК_ЛИТЕРАТУРЫ##")
-    sources = []
-    for ln in [l.strip() for l in src_raw.splitlines() if l.strip() and not l.strip().startswith("##")]:
+    sources  = []
+    for ln in [l.strip() for l in src_raw.splitlines() if l.strip() and not l.startswith("##")]:
         ln = re.sub(r"^(\d+)\.\d+\.", r"\1.", ln)
         if re.match(r"^\d+\.", ln): sources.append(ln)
         elif sources: sources[-1] += " " + ln
+
     return dict(
         intro      = [l.strip() for l in intro_raw.splitlines() if l.strip()],
         chapters   = chapters,
