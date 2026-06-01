@@ -1019,9 +1019,7 @@ async def call_deepseek(d: dict, on_progress) -> str:
     await on_progress(100, "✅ Taýar!")
     return result["text"]
 
-
 def parse_ai(raw: str, secs: int) -> dict:
-
     def _between(text, start, *ends):
         s = text.find(start)
         if s == -1: return ""
@@ -1031,8 +1029,16 @@ def parse_ai(raw: str, secs: int) -> dict:
             if p != -1 and p < best: best = p
         return text[s:best].strip()
 
-    # Her ## öňünde täze setir goş (birleşen markerler üçin)
+    # ## bolmadyk markerleri düzelt (ГЛАВА_3 → ##ГЛАВА_3##)
+    raw = re.sub(r"(?im)^ГЛАВА_(\d+)##?$", r"##ГЛАВА_\1##", raw)
+    raw = re.sub(r"(?im)^СПИСОК_ЛИТЕРАТУРЫ##?$", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
+    raw = re.sub(r"(?im)^ВВЕДЕНИЕ##?$", "##ВВЕДЕНИЕ##", raw)
+    raw = re.sub(r"(?im)^ЗАКЛЮЧЕНИЕ##?$", "##ЗАКЛЮЧЕНИЕ##", raw)
+
+    # Her ## öňünde täze setir goş
     raw = re.sub(r"(?m)(?<!^)(##[A-ZА-ЯЁ_0-9])", r"\n\1", raw)
+
+    # Marker bilen bir setirdäki goşmaça teksti aýyr
     raw = re.sub(r"(##ГЛАВА_\d+##)[^\n]*", r"\1", raw)
     raw = re.sub(r"(##ВВЕДЕНИЕ##)[^\n]*", r"\1", raw)
     raw = re.sub(r"(##ЗАКЛЮЧЕНИЕ##)[^\n]*", r"\1", raw)
@@ -1042,11 +1048,9 @@ def parse_ai(raw: str, secs: int) -> dict:
     for i in range(1, secs + 1):
         raw = re.sub(
             rf"(?im)^[*#]{{0,3}}\s*(?:глава\s+)?{i}[.)]\s+(.+?)\s*$",
-            rf"##ГЛАВА_{i}##\n{i}. \1",
-            raw
-        )
-    raw = re.sub(r"(?im)^[*#]{0,3}\s*введение\s*[*#:]{0,3}\s*$",       "##ВВЕДЕНИЕ##",         raw)
-    raw = re.sub(r"(?im)^[*#]{0,3}\s*заключение\s*[*#:]{0,3}\s*$",      "##ЗАКЛЮЧЕНИЕ##",       raw)
+            rf"##ГЛАВА_{i}##\n{i}. \1", raw)
+    raw = re.sub(r"(?im)^[*#]{0,3}\s*введение\s*[*#:]{0,3}\s*$",       "##ВВЕДЕНИЕ##",          raw)
+    raw = re.sub(r"(?im)^[*#]{0,3}\s*заключение\s*[*#:]{0,3}\s*$",      "##ЗАКЛЮЧЕНИЕ##",        raw)
     raw = re.sub(r"(?im)^[*#]{0,3}\s*(список\s+литературы|references)\s*[*#:]{0,3}\s*$", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
 
     # Marker ýok → awtobölünme
