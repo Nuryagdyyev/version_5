@@ -932,7 +932,6 @@ async def call_deepseek(d: dict, on_progress) -> str:
             "СПИСОК ЛИТЕРАТУРЫ: только 1. 2. 3. — без ##ГЛАВА## внутри. "
             "Все перечисления: 1. 2. 3. — без маркеров •/—."
         )
-        )
     _max_tok = d.get("_max_tokens_calc", 8000)
     body = {
         "model":       DEEPSEEK_MODEL,
