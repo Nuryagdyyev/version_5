@@ -921,13 +921,11 @@ async def call_deepseek(d: dict, on_progress) -> str:
         system_prompt = (
             "Ты профессиональный академический автор. "
             "Пиши ТОЛЬКО на русском языке. "
-            "Если в начале задания есть раздел «СТУДЕНТИҢ ÝÖRITE ТАЛАРЫ» — "
-            "это особые требования студента, их ОБЯЗАТЕЛЬНО нужно выполнить полностью. "
-            "Все перечисления нумеруй: 1. 2. 3. — никаких маркеров •/—. "
-            "Без вступлений и пояснений. "
-            "ОБЯЗАТЕЛЬНО используй ТОЛЬКО эти маркеры разделов: "
+            "ОБЯЗАТЕЛЬНО используй ТОЛЬКО эти маркеры разделов строго на отдельной строке: "
             "##ВВЕДЕНИЕ## ##ГЛАВА_1## ##ГЛАВА_2## ##ГЛАВА_3## ##ЗАКЛЮЧЕНИЕ## ##СПИСОК_ЛИТЕРАТУРЫ## "
-            "Каждый маркер пиши на отдельной строке. Без этих маркеров ответ недействителен."
+            "СПИСОК ЛИТЕРАТУРЫ: нумеруй просто: 1. Автор... 2. Автор... — НЕ используй ##ГЛАВА## внутри списка литературы. "
+            "Все перечисления нумеруй: 1. 2. 3. — никаких маркеров •/—. "
+            "Без вступлений и пояснений."
         )
     _max_tok = d.get("_max_tokens_calc", 8000)
     body = {
@@ -1029,7 +1027,7 @@ def parse_ai(raw: str, secs: int) -> dict:
             if p != -1 and p < best: best = p
         return text[s:best].strip()
 
-    # ## bolmadyk markerleri düzelt (ГЛАВА_3 → ##ГЛАВА_3##)
+    # ## bolmadyk markerleri düzelt
     raw = re.sub(r"(?im)^ГЛАВА_(\d+)##?$", r"##ГЛАВА_\1##", raw)
     raw = re.sub(r"(?im)^СПИСОК_ЛИТЕРАТУРЫ##?$", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
     raw = re.sub(r"(?im)^ВВЕДЕНИЕ##?$", "##ВВЕДЕНИЕ##", raw)
@@ -1085,7 +1083,11 @@ def parse_ai(raw: str, secs: int) -> dict:
     conc_raw = _between(raw, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
     src_raw  = _between(raw, "##СПИСОК_ЛИТЕРАТУРЫ##")
     sources  = []
-    for ln in [l.strip() for l in src_raw.splitlines() if l.strip() and not l.startswith("##")]:
+    # ← ÜÝTGÄN ÝER: ##ГЛАВА we ГЛАВА_ setirleri süzgüçlendi
+    for ln in [l.strip() for l in src_raw.splitlines()
+               if l.strip()
+               and not l.strip().startswith("##")
+               and not re.match(r"^ГЛАВА_", l.strip())]:
         ln = re.sub(r"^(\d+)\.\d+\.", r"\1.", ln)
         if re.match(r"^\d+\.", ln): sources.append(ln)
         elif sources: sources[-1] += " " + ln
