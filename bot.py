@@ -1038,7 +1038,7 @@ def parse_ai(raw: str, secs: int) -> dict:
     raw = re.sub(r"(?m)(?<!^)(##[A-ZА-ЯЁ_0-9])", r"\n\1", raw)
 
     # Marker bilen bir setirdäki goşmaça teksti aýyr
-    raw = re.sub(r"(##ГЛАВА_\d+##)[^\n]*", r"\1", raw)
+    raw = re.sub(r"(##ГЛАВА_\d+##)[ \t]*", r"\1\n", raw)
     raw = re.sub(r"(##ВВЕДЕНИЕ##)[^\n]*", r"\1", raw)
     raw = re.sub(r"(##ЗАКЛЮЧЕНИЕ##)[^\n]*", r"\1", raw)
     raw = re.sub(r"(##СПИСОК_ЛИТЕРАТУРЫ##)[^\n]*", r"\1", raw)
