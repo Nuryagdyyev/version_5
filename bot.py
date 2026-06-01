@@ -938,7 +938,7 @@ async def call_deepseek(d: dict, on_progress) -> str:
             {"role": "user",   "content": user_content_final},
         ],
         "max_tokens":  _max_tok,
-        "temperature": 0.7,
+        "temperature": 0.1,
         "stream":      False,
     }
     result: dict = {}
