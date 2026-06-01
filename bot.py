@@ -1029,15 +1029,18 @@ def parse_ai(raw: str, secs: int) -> dict:
             if p != -1 and p < best: best = p
         return text[s:best].strip()
 
+    # Marker # sany düzelt
+    raw = re.sub(r"##ЗАКЛЮЧЕНИЕ#+", "##ЗАКЛЮЧЕНИЕ##", raw)
+    raw = re.sub(r"##ВВЕДЕНИЕ#+", "##ВВЕДЕНИЕ##", raw)
+    raw = re.sub(r"##СПИСОК_ЛИТЕРАТУРЫ#+", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
+    raw = re.sub(r"##ГЛАВА_(\d+)#+", r"##ГЛАВА_\1##", raw)
     # ## bolmadyk markerleri düzelt
-    raw = re.sub(r"(?im)^ГЛАВА_(\d+)##?$", r"##ГЛАВА_\1##", raw)
-    raw = re.sub(r"(?im)^СПИСОК_ЛИТЕРАТУРЫ##?$", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
-    raw = re.sub(r"(?im)^ВВЕДЕНИЕ##?$", "##ВВЕДЕНИЕ##", raw)
-    raw = re.sub(r"(?im)^ЗАКЛЮЧЕНИЕ##?$", "##ЗАКЛЮЧЕНИЕ##", raw)
-
+    raw = re.sub(r"(?im)^ГЛАВА_(\d+)$", r"##ГЛАВА_\1##", raw)
+    raw = re.sub(r"(?im)^СПИСОК_ЛИТЕРАТУРЫ$", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
+    raw = re.sub(r"(?im)^ВВЕДЕНИЕ$", "##ВВЕДЕНИЕ##", raw)
+    raw = re.sub(r"(?im)^ЗАКЛЮЧЕНИЕ$", "##ЗАКЛЮЧЕНИЕ##", raw)
     # Her ## öňünde täze setir goş
     raw = re.sub(r"(?m)(?<!^)(##[A-ZА-ЯЁ_0-9])", r"\n\1", raw)
-
     # Marker bilen bir setirdäki goşmaça teksti aýyr
     raw = re.sub(r"(##ГЛАВА_\d+##)[ \t]*", r"\1\n", raw)
     raw = re.sub(r"(##ВВЕДЕНИЕ##)[^\n]*", r"\1", raw)
@@ -1073,7 +1076,7 @@ def parse_ai(raw: str, secs: int) -> dict:
     chapters = []
     for i in range(1, secs + 1):
         nxt    = f"##ГЛАВА_{i+1}##" if i < secs else "##ЗАКЛЮЧЕНИЕ##"
-        ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
+        ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##ЗАКЛЮЧЕНИЕ#", "##СПИСОК_ЛИТЕРАТУРЫ##")
         if not ch_raw: continue
         lines  = [l.strip() for l in ch_raw.splitlines() if l.strip()]
         title = f"{i}. Глава {i}"
