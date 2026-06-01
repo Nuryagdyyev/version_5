@@ -960,7 +960,7 @@ async def call_deepseek(d: dict, on_progress) -> str:
                     if not text or not text.strip():
                         raise RuntimeError("DeepSeek boş jogap iberdi")
                     result["text"] = text.strip()
-                    log.info(f"RAW:\n{text[:3000]}")  # ← şu setiri goş
+                    log.info(f"RAW:\n{text}")  # ← şu setiri goş
                     return
             except (httpx.ConnectError, httpx.ConnectTimeout,
                     httpx.ReadTimeout, httpx.RemoteProtocolError) as e:
