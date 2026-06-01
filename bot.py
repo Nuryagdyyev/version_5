@@ -960,6 +960,7 @@ async def call_deepseek(d: dict, on_progress) -> str:
                     if not text or not text.strip():
                         raise RuntimeError("DeepSeek boş jogap iberdi")
                     result["text"] = text.strip()
+                    log.info(f"RAW:\n{text[:3000]}")  # ← şu setiri goş
                     return
             except (httpx.ConnectError, httpx.ConnectTimeout,
                     httpx.ReadTimeout, httpx.RemoteProtocolError) as e:
@@ -1071,7 +1072,7 @@ def parse_ai(raw: str, secs: int) -> dict:
     chapters = []
     for i in range(1, secs + 1):
         nxt    = f"##ГЛАВА_{i+1}##" if i < secs else "##ЗАКЛЮЧЕНИЕ##"
-        ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##СПИСОК_ЛИТЕРАТУРЫ##")
+        ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
         if not ch_raw: continue
         lines  = [l.strip() for l in ch_raw.splitlines() if l.strip()]
         if lines and re.match(r"^\d+\.", lines[0]):
