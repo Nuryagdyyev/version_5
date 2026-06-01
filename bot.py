@@ -1035,9 +1035,9 @@ def parse_ai(raw: str, secs: int) -> dict:
     raw = re.sub(r"##ЗАКЛЮЧЕНИЕ#+", "##ЗАКЛЮЧЕНИЕ##", raw)
     raw = re.sub(r"##ВВЕДЕНИЕ#+", "##ВВЕДЕНИЕ##", raw)
     raw = re.sub(r"##СПИСОК_ЛИТЕРАТУРЫ#+", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
-    raw = re.sub(r"##ГЛАВА_(\d+)#+", r"##ГЛАВА_\1##", raw)
+    raw = re.sub(r"##ГЛАВА_(\d+)#*", r"##ГЛАВА_\1##", raw)
     # ## bolmadyk markerleri düzelt
-    raw = re.sub(r"(?im)^ГЛАВА_(\d+)$", r"##ГЛАВА_\1##", raw)
+    raw = re.sub(r"(?im)^ГЛАВА_(\d+)#*$", r"##ГЛАВА_\1##", raw)
     raw = re.sub(r"(?im)^СПИСОК_ЛИТЕРАТУРЫ$", "##СПИСОК_ЛИТЕРАТУРЫ##", raw)
     raw = re.sub(r"(?im)^ВВЕДЕНИЕ$", "##ВВЕДЕНИЕ##", raw)
     raw = re.sub(r"(?im)^ЗАКЛЮЧЕНИЕ$", "##ЗАКЛЮЧЕНИЕ##", raw)
@@ -1078,7 +1078,7 @@ def parse_ai(raw: str, secs: int) -> dict:
     chapters = []
     for i in range(1, secs + 1):
         nxt    = f"##ГЛАВА_{i+1}##" if i < secs else "##ЗАКЛЮЧЕНИЕ##"
-        ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##ЗАКЛЮЧЕНИЕ#", "##СПИСОК_ЛИТЕРАТУРЫ##")
+        ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
         if not ch_raw: continue
         lines  = [l.strip() for l in ch_raw.splitlines() if l.strip()]
         title = f"{i}. Глава {i}"
@@ -1093,7 +1093,6 @@ def parse_ai(raw: str, secs: int) -> dict:
     conc_raw = _between(raw, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
     src_raw  = _between(raw, "##СПИСОК_ЛИТЕРАТУРЫ##")
     sources  = []
-    # ← ÜÝTGÄN ÝER: ##ГЛАВА we ГЛАВА_ setirleri süzgüçlendi
     for ln in [l.strip() for l in src_raw.splitlines()
                if l.strip()
                and not l.strip().startswith("##")
