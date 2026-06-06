@@ -53,7 +53,7 @@ INTRO_VIDEO_URL  = "https://youtu.be/Lm3D5o-4gcM?si=rjMoWCbWourFm8C9"
 DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL   = "deepseek-chat"
 PRICE            = {"referat": 299, "doklad": 299, "pptx": 299}  # rubl
-PRICE_STARS      = {"referat": 149, "doklad": 149, "pptx": 149}  # Telegram Stars
+PRICE_STARS      = {"referat": 1, "doklad": 1, "pptx": 1}  # Telegram Stars
 CARD_NUMBER      = "2202 2084 5873 0067"
 PHONE_NUMBER     = "+7 922 309 80 64"
 CARD_HOLDER      = "Мекан Н"
@@ -1024,42 +1024,94 @@ async def call_deepseek(d: dict, on_progress) -> str:
 
 
 def parse_ai(raw: str, secs: int) -> dict:
-    def _between(text, start, *ends):
-        s = text.find(start)
-        if s == -1: return ""
-        s += len(start); best = len(text)
-        for e in ends:
-            p = text.find(e, s)
-            if p != -1 and p < best: best = p
-        return text[s:best].strip()
+    import re as _re
 
-    intro_raw = _between(raw, "##ВВЕДЕНИЕ##", "##ГЛАВА_1##", "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
-    chapters: list = []
-    for i in range(1, secs + 1):
-        nxt    = f"##ГЛАВА_{i+1}##" if i < secs else "##ЗАКЛЮЧЕНИЕ##"
-        ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##СПИСОК_ЛИТЕРАТУРЫ##")
-        if not ch_raw: continue
-        lines = [ln.strip() for ln in ch_raw.splitlines() if ln.strip()]
-        if lines and re.match(r"^\d+\.", lines[0]):
-            title = md_clean(lines[0]); body = lines[1:]
-        else:
-            title = f"{i}. Глава {i}"; body = lines
-        chapters.append({"title": title, "lines": body})
-    conc_raw = _between(raw, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
-    src_raw  = _between(raw, "##СПИСОК_ЛИТЕРАТУРЫ##")
-    raw_srcs = [ln.strip() for ln in src_raw.splitlines() if ln.strip() and not ln.strip().startswith("##")]
-    sources: list = []
-    for ln in raw_srcs:
-        ln = re.sub(r"^(\d+)\.\d+\.", r"\1.", ln)
-        if re.match(r"^\d+\.", ln): sources.append(ln)
-        elif sources: sources[-1] += " " + ln
-    return dict(
-        intro      = [ln.strip() for ln in intro_raw.splitlines() if ln.strip()],
-        chapters   = chapters,
-        conclusion = [ln.strip() for ln in conc_raw.splitlines() if ln.strip()],
-        sources    = sources,
+    # Islendik marker formatyny standartlaşdyr
+    # Mysal: ## ВВЕДЕНИЕ ## → ##ВВЕДЕНИЕ##
+    # **##ВВЕДЕНИЕ##** → ##ВВЕДЕНИЕ##
+    raw = _re.sub(r'\*+', '', raw)  # ** aýyr
+    raw = _re.sub(r'##\s*([А-ЯЁA-Z_\d]+)\s*##', r'##\1##', raw)
+    
+    # Глава_1, Глава 1, глава_1 hemmesini ##ГЛАВА_1## edip düzelt
+    raw = _re.sub(
+        r'##\s*[Гг][Лл][Аа][Вв][Аа]\s*_?\s*(\d)\s*##',
+        lambda m: f'##ГЛАВА_{m.group(1)}##',
+        raw
     )
 
+    def _between(text, start, *ends):
+        lo = text.lower()
+        sl = start.lower()
+        s = lo.find(sl)
+        if s == -1:
+            return ""
+        s += len(start)
+        best = len(text)
+        for e in ends:
+            p = lo.find(e.lower(), s)
+            if p != -1 and p < best:
+                best = p
+        return text[s:best].strip()
+
+    # Giriş
+    intro_raw = _between(raw, "##ВВЕДЕНИЕ##",
+                         "##ГЛАВА_1##", "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
+    if not intro_raw:
+        m = _re.search(r'##[А-ЯЁ_\d]+##', raw)
+        intro_raw = raw[:m.start()].strip() if m else ""
+
+    # Bölümler
+    chapters = []
+    for i in range(1, secs + 1):
+        nxt = f"##ГЛАВА_{i+1}##" if i < secs else "##ЗАКЛЮЧЕНИЕ##"
+        ch_raw = _between(raw, f"##ГЛАВА_{i}##", nxt, "##СПИСОК_ЛИТЕРАТУРЫ##")
+        if not ch_raw:
+            pat = _re.compile(
+                rf'##ГЛАВА_{i}##(.*?)(?=##ГЛАВА_{i+1}##|##ЗАКЛЮЧЕНИЕ##|##СПИСОК|$)',
+                _re.DOTALL | _re.IGNORECASE)
+            m2 = pat.search(raw)
+            ch_raw = m2.group(1).strip() if m2 else ""
+        if not ch_raw:
+            continue
+        lines = [ln.strip() for ln in ch_raw.splitlines() if ln.strip()]
+        if lines and _re.match(r"^\d+[\.\)]\s*\S", lines[0]):
+            title = md_clean(lines[0])
+            body = lines[1:]
+        else:
+            title = f"{i}. Раздел {i}"
+            body = lines
+        chapters.append({"title": title, "lines": body})
+
+    # Netije
+    conc_raw = _between(raw, "##ЗАКЛЮЧЕНИЕ##", "##СПИСОК_ЛИТЕРАТУРЫ##")
+    if not conc_raw:
+        m3 = _re.search(
+            r'##ЗАКЛЮЧЕНИЕ##(.*?)(?=##СПИСОК|$)', raw, _re.DOTALL | _re.IGNORECASE)
+        conc_raw = m3.group(1).strip() if m3 else ""
+
+    # Çeşmeler
+    src_raw = _between(raw, "##СПИСОК_ЛИТЕРАТУРЫ##")
+    if not src_raw:
+        m4 = _re.search(
+            r'##СПИСОК_ЛИТЕРАТУРЫ##(.*)$', raw, _re.DOTALL | _re.IGNORECASE)
+        src_raw = m4.group(1).strip() if m4 else ""
+
+    raw_srcs = [ln.strip() for ln in src_raw.splitlines()
+                if ln.strip() and not ln.strip().startswith("##")]
+    sources = []
+    for ln in raw_srcs:
+        ln = _re.sub(r"^(\d+)\.\d+\.", r"\1.", ln)
+        if _re.match(r"^\d+\.", ln):
+            sources.append(ln)
+        elif sources:
+            sources[-1] += " " + ln
+
+    return dict(
+        intro=[ln.strip() for ln in intro_raw.splitlines() if ln.strip()],
+        chapters=chapters,
+        conclusion=[ln.strip() for ln in conc_raw.splitlines() if ln.strip()],
+        sources=sources,
+    )
 
 def _sf(run, size_pt=14, bold=False, italic=False):
     run.font.name = "Times New Roman"; run.font.size = Pt(size_pt)
@@ -2665,48 +2717,218 @@ async def _pptx_one_batch(theme: str, slide_nums: list, total_slides: int,
     return result
 
 
-async def call_deepseek_pptx(theme: str, slides: int, pres_lang: str) -> list:
-    lang_str = {"ru":"русском","en":"English","tk":"туркменском","tr":"турецком"}.get(pres_lang,"русском")
-    if pres_lang == "en":
-        system = ("You are a presentation expert. Reply ONLY with a valid JSON array, no markdown, no extra text. "
-                  "Write ALL slide texts ONLY in English.")
-    elif pres_lang == "tr":
-        system = ("Sen sunum uzmanısın. SADECE geçerli JSON dizisi döndür, markdown yok. "
-                  "Tüm metinleri YALNIZCA Türkçe yaz.")
-    elif pres_lang == "tk":
-        system = ("Sen prezentasiýa hünärmeni. Diňe dogry JSON massiwi gaýtar, markdown ýok. "
-                  "Ähli tekstleri diňe türkmen dilinde ýaz.")
+async def call_deepseek(d: dict, on_progress) -> str:
+    prompt  = build_prompt(d)
+    headers = {
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type":  "application/json",
+        "Accept-Encoding": "identity",
+        "Accept": "application/json",
+    }
+
+    # Req items (talap tekstleri)
+    req_items = d.get("req_items", [])
+    extra_texts = []
+    for item in req_items:
+        if item["type"] == "text":
+            extra_texts.append(item["content"])
+        elif item["type"] == "image":
+            extra_texts.append("[Ulanyjy surat iberdi — suradyň ýanyndaky tekst talabyna görä hereket et]")
+
+    if extra_texts:
+        user_content_final = "\n\n".join(extra_texts) + "\n\n" + prompt
     else:
-        system = ("Ты эксперт по презентациям. Отвечай ТОЛЬКО валидным JSON массивом, без markdown, без лишнего текста. "
-                  "Пиши ВСЕ тексты ТОЛЬКО на русском языке.")
+        user_content_final = prompt
 
-    # Slaýdlary toparlara böl: max 5 slaýd bir toparda
-    BATCH = 5
-    all_nums = list(range(1, slides + 1))
-    batches  = [all_nums[i:i+BATCH] for i in range(0, len(all_nums), BATCH)]
+    _doc_lang = d.get("doc_lang", "ru")
+    secs = int(d.get("sections", 2))
 
-    all_data = []
-    for batch_nums in batches:
-        batch_data = await _pptx_one_batch(theme, batch_nums, slides, pres_lang, system, lang_str)
-        # Eger az geldi - fallback goş
-        while len(batch_data) < len(batch_nums):
-            idx = len(all_data) + len(batch_data) + 1
-            batch_data.append({
-                "title": f"{theme} — {idx}",
-                "points": [
-                    f"🔹 {theme} barada {idx}-nji bölüm.",
-                    f"📊 Bu bölümde esasy maglumatlar beýan edilýär.",
-                    f"✅ Görkezijiler we netijelar seljerilýär.",
-                ],
-                "image_prompt": f"{theme} professional photography high quality",
-                "has_chart": False,
-                "chart_data": {}
-            })
-        all_data.extend(batch_data[:len(batch_nums)])
-        log.info(f"PPTX batch {batch_nums[0]}-{batch_nums[-1]}: {len(batch_data)} slaýd alyndy")
+    if _doc_lang == "en":
+        system_prompt = (
+            "You are a professional academic author. "
+            "Write ONLY in the English language. "
+            "You MUST use EXACTLY these markers on separate lines:\n"
+            "##ВВЕДЕНИЕ##\n"
+            + "".join(f"##ГЛАВА_{i}##\n" for i in range(1, secs + 1))
+            + "##ЗАКЛЮЧЕНИЕ##\n"
+            "##СПИСОК_ЛИТЕРАТУРЫ##\n"
+            "Write markers EXACTLY as shown — no spaces, no bold, no changes. "
+            "If there is a special requirements section — follow them completely. "
+            "Number all lists: 1. 2. 3. — no bullet points."
+        )
+    else:
+        system_prompt = (
+            "Ты профессиональный академический автор. "
+            "Пиши ТОЛЬКО на русском языке. "
+            "СТРОГО ОБЯЗАТЕЛЬНО: используй ИМЕННО ЭТИ маркеры на отдельной строке:\n"
+            "##ВВЕДЕНИЕ##\n"
+            + "".join(f"##ГЛАВА_{i}##\n" for i in range(1, secs + 1))
+            + "##ЗАКЛЮЧЕНИЕ##\n"
+            "##СПИСОК_ЛИТЕРАТУРЫ##\n"
+            "Маркеры писать ТОЧНО так — без пробелов, без звёздочек, без изменений. "
+            "Все перечисления: 1. 2. 3. — без маркеров. "
+            "НЕ используй markdown форматирование."
+        )
 
-    return all_data[:slides]
+    _max_tok = d.get("_max_tokens_calc", 8000)
+    body = {
+        "model":       DEEPSEEK_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_content_final},
+        ],
+        "max_tokens":  _max_tok,
+        "temperature": 0.7,
+        "stream":      False,
+    }
 
+    result: dict = {}
+    error:  dict = {}
+    done:   dict = {"flag": False}
+
+    async def fetch():
+        max_retries = 5
+        last_exc    = None
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(connect=60.0, read=600.0, write=60.0, pool=30.0),
+                    limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                    http2=False,
+                ) as cl:
+                    r = await cl.post(DEEPSEEK_URL, headers=headers, json=body)
+
+                    if r.status_code != 200:
+                        raise RuntimeError(f"HTTP {r.status_code}: {r.text[:300]}")
+
+                    resp = r.json()
+                    text = resp["choices"][0]["message"]["content"]
+
+                    if not text or not text.strip():
+                        raise RuntimeError("DeepSeek boş jogap iberdi")
+
+                    raw = text.strip()
+
+                    # ── LOG: hakyky gelýän teksti gör ──
+                    log.info(f"=== DEEPSEEK RAW (ilkinji 800 simwol) ===\n{raw[:800]}\n==================")
+
+                    # ── Markerleri normalize et ──
+                    import re as _re
+
+                    # ** bold ** aýyr
+                    raw = _re.sub(r'\*+', '', raw)
+
+                    # ## ВВЕДЕНИЕ ## → ##ВВЕДЕНИЕ##  (boşluklar bilen)
+                    raw = _re.sub(
+                        r'##\s*([А-ЯЁA-Z_\d]+)\s*##',
+                        r'##\1##',
+                        raw
+                    )
+
+                    # Глава_1 / Глава 1 / глава_1 hemmesi → ##ГЛАВА_1##
+                    raw = _re.sub(
+                        r'##\s*[Гг][Лл][Аа][Вв][Аа]\s*_?\s*(\d)\s*##',
+                        lambda m: f'##ГЛАВА_{m.group(1)}##',
+                        raw
+                    )
+
+                    # Eger hiç marker tapylmasa — düýbünden nädogry format
+                    if '##ВВЕДЕНИЕ##' not in raw and '##ГЛАВА_1##' not in raw:
+                        log.warning(
+                            f"⚠️ Attempt {attempt}: Marker tapylmady! "
+                            f"Raw başy: {raw[:300]}"
+                        )
+                        if attempt < max_retries:
+                            wait = attempt * 8
+                            log.info(f"Täzeden synanyşylýar {wait}s soň...")
+                            await asyncio.sleep(wait)
+                            continue
+                        else:
+                            # Soňky synanyşykda — raw-y şeýle hem gaýtar,
+                            # parse_ai özi düşünmäge çalşar
+                            log.error("❌ Ähli synanyşyk gutardy, raw gaýtarylýar")
+                            result["text"] = raw
+                            return
+
+                    result["text"] = raw
+                    log.info(
+                        f"✅ Attempt {attempt}: Marker tapyldy, "
+                        f"jogap {len(raw)} simwol"
+                    )
+                    return
+
+            except (httpx.ConnectError, httpx.ConnectTimeout,
+                    httpx.ReadTimeout, httpx.RemoteProtocolError) as e:
+                last_exc = e
+                wait = min(attempt * 10, 60)
+                log.warning(
+                    f"Bağlantı {attempt}/{max_retries}: "
+                    f"{type(e).__name__} — {wait}s garaşylýar"
+                )
+                await asyncio.sleep(wait)
+
+            except RuntimeError as e:
+                error["exc"] = e
+                done["flag"] = True
+                return
+
+            except Exception as e:
+                last_exc = e
+                wait = min(attempt * 10, 60)
+                log.warning(f"Ýalňyşlyk {attempt}/{max_retries}: {e} — {wait}s garaşylýar")
+                await asyncio.sleep(wait)
+
+        error["exc"] = last_exc
+        done["flag"] = True
+
+    async def ticker():
+        stage_idx = 0
+        elapsed   = 0
+        _stages   = get_stages(d.get("ui_lang", "tk"))
+
+        while not done["flag"]:
+            await asyncio.sleep(6)
+            elapsed += 6
+
+            if stage_idx < len(_stages):
+                pct, status = _stages[stage_idx]
+                stage_idx += 1
+            else:
+                pct    = 97
+                mins   = elapsed // 60
+                secs_e = elapsed % 60
+                _wait_lbl = {
+                    "tk": f"⏳ Taýarlanýar... {mins}:{secs_e:02d}",
+                    "ru": f"⏳ Создаётся... {mins}:{secs_e:02d}",
+                    "en": f"⏳ Creating... {mins}:{secs_e:02d}",
+                }.get(d.get("ui_lang", "tk"), "⏳")
+                status = _wait_lbl
+
+            try:
+                await on_progress(pct, status)
+            except Exception:
+                pass
+
+    done["flag"] = False
+    ft = asyncio.create_task(fetch())
+    tt = asyncio.create_task(ticker())
+
+    try:
+        await ft
+    finally:
+        done["flag"] = True
+        tt.cancel()
+        try:
+            await tt
+        except asyncio.CancelledError:
+            pass
+
+    if "exc" in error:
+        raise error["exc"]
+
+    await on_progress(100, "✅ Taýar!")
+    return result["text"]
 
 # ─── PPTX HANDLERS ───────────────────────────────────────────────────
 
